@@ -1,0 +1,2114 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EMS-SCADA | Megarevo MPS & Schneider PowerLogic Monitor</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            scada: {
+              bg: '#090d16',
+              panel: '#111827',
+              card: '#161f33',
+              border: '#243049',
+              highlight: '#1e293b'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #090d16;
+      color: #f1f5f9;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Custom Scrollbar for industrial tables */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #090d16;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #243049;
+      border-radius: 9999px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3b4d73;
+    }
+
+    /* Animated power flow lines in SVG */
+    @keyframes flowDash {
+      to {
+        stroke-dashoffset: -24;
+      }
+    }
+
+    .power-flow-active {
+      stroke-dasharray: 6 6;
+      animation: flowDash 1s linear infinite;
+    }
+
+    .power-flow-reverse {
+      stroke-dasharray: 6 6;
+      animation: flowDash 1s linear infinite reverse;
+    }
+
+    @keyframes pulseGlow {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.45;
+      }
+    }
+
+    .live-dot {
+      animation: pulseGlow 1.8s ease-in-out infinite;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col selection:bg-cyan-500/30 selection:text-cyan-200">
+
+  <!-- Toast Notification Banner -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Top System Header & LTE Gateway Connection Bar -->
+  <header class="bg-scada-panel border-b border-scada-border sticky top-0 z-30 shadow-xl">
+    <div class="max-w-[1600px] mx-auto px-3 sm:px-6 py-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <!-- Brand & Substation Title -->
+        <div class="flex items-center gap-3.5">
+          <!-- in4solar SOLUTIONS Logo Badge (Click to upload custom logo override) -->
+          <div onclick="document.getElementById('logo-upload-input').click()"
+            title="Click to upload a custom company logo image"
+            class="cursor-pointer group relative bg-[#1A2D42] hover:bg-[#203750] border border-cyan-500/35 rounded-xl px-3.5 py-2 flex items-center justify-center shadow-lg transition shrink-0">
+            <input type="file" id="logo-upload-input" accept="image/*" class="hidden" onchange="handleCustomLogoUpload(event)" />
+            <img id="custom-company-logo" alt="Company Logo" class="hidden h-9 sm:h-10 w-auto object-contain rounded" />
+            <svg id="default-in4solar-logo" viewBox="0 0 280 76" class="h-9 sm:h-10 w-auto select-none"
+              aria-label="in4solar SOLUTIONS">
+              <!-- 'in4' in bright cyan-blue (#0096D6) -->
+              <text x="6" y="47" fill="#0096D6" font-family="Inter, sans-serif" font-weight="800" font-size="44"
+                letter-spacing="-1.5">in4</text>
+              <!-- 's' in deep royal blue (#0D47A1) -->
+              <text x="74" y="47" fill="#0D47A1" font-family="Inter, sans-serif" font-weight="800" font-size="44"
+                letter-spacing="-1">s</text>
+              <!-- Sun circle replacing 'o' (#FFD600) with subtle crescent inner arc -->
+              <circle cx="118" cy="33" r="15.5" fill="#FFD600" />
+              <path d="M 106.5 26 A 14 14 0 0 1 129.5 26" fill="none" stroke="#1A2D42" stroke-width="1.6"
+                stroke-linecap="round" />
+              <path d="M 129.5 39 A 14 14 0 0 1 113.5 45.5" fill="none" stroke="#1A2D42" stroke-width="1.6"
+                stroke-linecap="round" />
+              <!-- 'lar' in deep royal blue (#0D47A1) -->
+              <text x="137" y="47" fill="#0D47A1" font-family="Inter, sans-serif" font-weight="800" font-size="44"
+                letter-spacing="-1">lar</text>
+              <!-- 'SOLUTIONS' in tracked light slate-blue beneath 'solar' -->
+              <text x="80" y="67" fill="#8FA8C8" font-family="Inter, sans-serif" font-weight="600" font-size="14.5"
+                letter-spacing="4.2">SOLUTIONS</text>
+            </svg>
+            <span class="opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-2 right-1.5 bg-slate-900/95 text-[9px] font-mono text-cyan-300 px-1.5 py-0.2 rounded border border-cyan-500/40 pointer-events-none">
+              EDIT LOGO
+            </span>
+          </div>
+
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">MICROGRID EMS SCADA</h1>
+              <span class="px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                4× MEGAREVO MPS + 4× SCHNEIDER PM
+              </span>
+            </div>
+            <p class="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+              <span>LTE RTU Gateway: <strong id="hdr-gateway-addr" class="font-mono text-slate-300">10.8.0.12:502</strong></span>
+              <span>•</span>
+              <span>Last Poll: <strong id="hdr-last-poll" class="font-mono text-emerald-400">--:--:--</strong></span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Connection Controls & Actions -->
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+          <!-- Mode Toggle Pill (Simulation vs Live Termux/LTE API) -->
+          <div class="flex items-center bg-scada-bg p-1 rounded-xl border border-scada-border">
+            <button id="btn-mode-sim" onclick="setDataMode('SIM')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+              <span class="w-2 h-2 rounded-full bg-cyan-400 live-dot"></span>
+              SIMULATION
+            </button>
+            <button id="btn-mode-live" onclick="setDataMode('LIVE')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200">
+              <span id="live-status-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+              LIVE LTE API
+            </button>
+          </div>
+
+          <!-- Polling Interval Selector -->
+          <div class="flex items-center gap-1.5 bg-scada-bg px-2.5 py-1.5 rounded-xl border border-scada-border">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-slate-400"></i>
+            <label for="poll-interval" class="text-xs text-slate-400 hidden sm:inline">Poll:</label>
+            <select id="poll-interval" onchange="updatePollInterval(this.value)" class="bg-transparent text-xs font-mono font-semibold text-slate-200 focus:outline-none cursor-pointer">
+              <option value="1000" class="bg-scada-panel">1.0s</option>
+              <option value="2000" selected class="bg-scada-panel">2.0s</option>
+              <option value="5000" class="bg-scada-panel">5.0s</option>
+              <option value="10000" class="bg-scada-panel">10.0s</option>
+            </select>
+          </div>
+
+          <!-- Gateway Config Button -->
+          <button onclick="openGatewayModal()" class="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-scada-card hover:bg-scada-highlight border border-scada-border text-xs font-medium text-slate-200 flex items-center gap-1.5 transition">
+            <i data-lucide="router" class="w-4 h-4 text-amber-400"></i>
+            <span class="hidden md:inline">LTE Gateway</span>
+          </button>
+
+          <!-- Export CSV/JSON -->
+          <div class="relative group">
+            <button onclick="exportTelemetryCSV()" class="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-xs font-medium text-emerald-300 flex items-center gap-1.5 transition">
+              <i data-lucide="download" class="w-4 h-4"></i>
+              <span class="hidden md:inline">Export CSV</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Site Overview KPI Strip -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mt-3 pt-3 border-t border-scada-border/80">
+        <!-- KPI 1: Total PV Power -->
+        <div class="bg-scada-bg/90 border border-scada-border rounded-xl px-3 py-2 flex items-center justify-between">
+          <div>
+            <div class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Total PV Array</div>
+            <div class="text-base sm:text-lg font-bold font-mono tabular-nums text-cyan-400 mt-0.5">
+              <span id="kpi-pv-kw">0.0</span> <span class="text-xs font-normal text-slate-400">kW</span>
+            </div>
+          </div>
+          <div
+            class="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+            <i data-lucide="sun" class="w-4 h-4"></i>
+          </div>
+        </div>
+
+        <!-- KPI 2: Total Inverter Active Power -->
+        <div class="bg-scada-bg/90 border border-scada-border rounded-xl px-3 py-2 flex items-center justify-between">
+          <div>
+            <div class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">MPS Inverters (4)</div>
+            <div class="text-base sm:text-lg font-bold font-mono tabular-nums text-emerald-400 mt-0.5">
+              <span id="kpi-inv-kw">0.0</span> <span class="text-xs font-normal text-slate-400">kW</span>
+            </div>
+          </div>
+          <div
+            class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <i data-lucide="zap" class="w-4 h-4"></i>
+          </div>
+        </div>
+
+        <!-- KPI 3: Total Utility / Transformer Load -->
+        <div class="bg-scada-bg/90 border border-scada-border rounded-xl px-3 py-2 flex items-center justify-between">
+          <div>
+            <div class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Transformers (T1+T2)</div>
+            <div class="text-base sm:text-lg font-bold font-mono tabular-nums text-indigo-400 mt-0.5">
+              <span id="kpi-tx-kw">0.0</span> <span class="text-xs font-normal text-slate-400">kW</span>
+            </div>
+          </div>
+          <div
+            class="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+            <i data-lucide="utility-pole" class="w-4 h-4"></i>
+          </div>
+        </div>
+
+        <!-- KPI 4: Total Generator Power -->
+        <div class="bg-scada-bg/90 border border-scada-border rounded-xl px-3 py-2 flex items-center justify-between">
+          <div>
+            <div class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Generators (G1+G2)</div>
+            <div class="text-base sm:text-lg font-bold font-mono tabular-nums text-amber-400 mt-0.5">
+              <span id="kpi-gen-kw">0.0</span> <span class="text-xs font-normal text-slate-400">kW</span>
+            </div>
+          </div>
+          <div
+            class="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+            <i data-lucide="flame" class="w-4 h-4"></i>
+          </div>
+        </div>
+
+        <!-- KPI 5: Average Battery SOC -->
+        <div class="bg-scada-bg/90 border border-scada-border rounded-xl px-3 py-2 flex items-center justify-between">
+          <div>
+            <div class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Avg BESS SOC</div>
+            <div class="text-base sm:text-lg font-bold font-mono tabular-nums text-teal-400 mt-0.5">
+              <span id="kpi-soc">0.0</span> <span class="text-xs font-normal text-slate-400">%</span>
+            </div>
+          </div>
+          <div
+            class="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400">
+            <i data-lucide="battery-charging" class="w-4 h-4"></i>
+          </div>
+        </div>
+
+        <!-- KPI 6: System Bus Frequency -->
+        <div class="bg-scada-bg/90 border border-scada-border rounded-xl px-3 py-2 flex items-center justify-between">
+          <div>
+            <div class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">AC Bus Frequency</div>
+            <div class="text-base sm:text-lg font-bold font-mono tabular-nums text-slate-100 mt-0.5">
+              <span id="kpi-freq">50.00</span> <span class="text-xs font-normal text-slate-400">Hz</span>
+            </div>
+          </div>
+          <div
+            class="w-8 h-8 rounded-lg bg-slate-700/40 border border-slate-600/40 flex items-center justify-center text-slate-300">
+            <i data-lucide="activity" class="w-4 h-4"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex items-center gap-1.5 overflow-x-auto pt-3 mt-3 border-t border-scada-border/60 no-scrollbar">
+        <button onclick="switchTab('overview')" id="tab-btn-overview" class="tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 whitespace-nowrap bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 transition">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+          Overview & Single-Line
+        </button>
+        <button onclick="switchTab('inverters')" id="tab-btn-inverters" class="tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 whitespace-nowrap text-slate-400 hover:text-slate-200 hover:bg-scada-card border border-transparent transition">
+          <i data-lucide="cpu" class="w-4 h-4"></i>
+          Megarevo MPS Inverters (4)
+        </button>
+        <button onclick="switchTab('meters')" id="tab-btn-meters" class="tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 whitespace-nowrap text-slate-400 hover:text-slate-200 hover:bg-scada-card border border-transparent transition">
+          <i data-lucide="gauge" class="w-4 h-4"></i>
+          Schneider Power Meters (4)
+        </button>
+        <button onclick="switchTab('modbus')" id="tab-btn-modbus" class="tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 whitespace-nowrap text-slate-400 hover:text-slate-200 hover:bg-scada-card border border-transparent transition">
+          <i data-lucide="terminal" class="w-4 h-4"></i>
+          Modbus Map & Termux Setup
+        </button>
+        <button onclick="switchTab('alarms')" id="tab-btn-alarms" class="tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 whitespace-nowrap text-slate-400 hover:text-slate-200 hover:bg-scada-card border border-transparent transition">
+          <i data-lucide="bell-ring" class="w-4 h-4"></i>
+          Alarms & Events
+          <span id="alarm-badge" class="px-1.5 py-0.2 text-[10px] font-mono rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">2</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Workspace Content -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto px-3 sm:px-6 py-5">
+
+    <!-- =================================================================== -->
+    <!-- TAB 1: OVERVIEW & SINGLE-LINE DIAGRAM                               -->
+    <!-- =================================================================== -->
+    <section id="tab-overview" class="space-y-5">
+      <!-- Simulation Scenario Controls (Helpful for testing plant states) -->
+      <div
+        class="bg-scada-panel border border-scada-border rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <span class="px-2.5 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">
+            PLANT OPERATING SCENARIO
+          </span>
+          <span id="scenario-desc" class="text-xs text-slate-300">Normal Grid-Parallel Operation (Transformers Online, Generators Standby)</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="setPlantScenario('NORMAL')" id="scen-normal" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 transition">
+            Grid Parallel (T1+T2)
+          </button>
+          <button onclick="setPlantScenario('GEN_BACKUP')" id="scen-gen" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-scada-card text-slate-300 hover:bg-scada-highlight border border-scada-border transition">
+            Grid Outage / Gen Backup (G1+G2)
+          </button>
+          <button onclick="setPlantScenario('PEAK_SHAVE')" id="scen-peak" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-scada-card text-slate-300 hover:bg-scada-highlight border border-scada-border transition">
+            Peak Shaving (Max MPS Discharge)
+          </button>
+        </div>
+      </div>
+
+      <!-- Interactive Single-Line Busbar Diagram -->
+      <div class="bg-scada-panel border border-scada-border rounded-2xl p-4 sm:p-5 shadow-lg">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div>
+            <h2 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="git-merge" class="w-4 h-4 text-cyan-400"></i>
+              Substation Single-Line Diagram (400V AC Main Busbar)
+            </h2>
+            <p class="text-xs text-slate-400">Click any breaker symbol (ACB) to toggle breaker state or click a unit to
+              inspect detailed registers.</p>
+          </div>
+          <div class="flex items-center gap-4 text-xs">
+            <span class="flex items-center gap-1.5 text-emerald-400"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span>
+            Breaker Closed</span>
+            <span class="flex items-center gap-1.5 text-rose-400"><span class="w-2.5 h-2.5 rounded-sm border border-rose-500 bg-rose-500/20"></span>
+            Breaker Open</span>
+            <span class="flex items-center gap-1.5 text-cyan-400"><span class="w-3 h-0.5 bg-cyan-400"></span> Active
+            Power Flow</span>
+          </div>
+        </div>
+
+        <!-- Responsive SVG Single-Line Diagram -->
+        <div class="w-full overflow-x-auto bg-scada-bg rounded-xl border border-scada-border p-2">
+          <svg id="sld-svg" viewBox="0 0 1200 540" class="w-full min-w-[900px] h-auto select-none font-mono">
+            <!-- Grid Background Pattern -->
+            <defs>
+              <pattern id="scada-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+                <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#162035" stroke-width="1" />
+              </pattern>
+            </defs>
+            <rect width="1200" height="540" fill="url(#scada-grid)" rx="8" />
+
+            <!-- ==================== TOP SOURCES: T1, T2, G1, G2 ==================== -->
+            <!-- Transformer 1 (X=160) -->
+            <g class="cursor-pointer" onclick="switchTab('meters')">
+              <rect x="65" y="18" width="190" height="92" rx="10" fill="#111827" stroke="#6366f1" stroke-width="1.5" />
+              <text x="160" y="38" text-anchor="middle" fill="#a5b4fc" font-size="12" font-weight="700">TRANSFORMER 1
+                (PM-11)</text>
+              <text id="sld-t1-kw" x="160" y="62" text-anchor="middle" fill="#ffffff" font-size="16"
+                font-weight="700">142.5 kW</text>
+              <text id="sld-t1-sub" x="160" y="81" text-anchor="middle" fill="#94a3b8" font-size="11">148.2 kVA | PF
+                0.96</text>
+              <text id="sld-t1-v" x="160" y="98" text-anchor="middle" fill="#34d399" font-size="11">401.2 V | 213.4
+                A</text>
+            </g>
+            <!-- Line T1 to Bus -->
+            <line id="line-t1" x1="160" y1="110" x2="160" y2="235" stroke="#6366f1" stroke-width="3"
+              class="power-flow-active" />
+            <!-- Breaker ACB-T1 -->
+            <g class="cursor-pointer" onclick="toggleBreaker('T1')">
+              <rect id="brk-t1-box" x="146" y="158" width="28" height="28" rx="4" fill="#10b981" stroke="#064e3b"
+                stroke-width="2" />
+              <text x="184" y="176" fill="#cbd5e1" font-size="10" font-weight="600">ACB-T1</text>
+            </g>
+
+            <!-- Transformer 2 (X=430) -->
+            <g class="cursor-pointer" onclick="switchTab('meters')">
+              <rect x="335" y="18" width="190" height="92" rx="10" fill="#111827" stroke="#6366f1" stroke-width="1.5" />
+              <text x="430" y="38" text-anchor="middle" fill="#a5b4fc" font-size="12" font-weight="700">TRANSFORMER 2
+                (PM-12)</text>
+              <text id="sld-t2-kw" x="430" y="62" text-anchor="middle" fill="#ffffff" font-size="16"
+                font-weight="700">138.0 kW</text>
+              <text id="sld-t2-sub" x="430" y="81" text-anchor="middle" fill="#94a3b8" font-size="11">143.7 kVA | PF
+                0.96</text>
+              <text id="sld-t2-v" x="430" y="98" text-anchor="middle" fill="#34d399" font-size="11">400.8 V | 207.1
+                A</text>
+            </g>
+            <line id="line-t2" x1="430" y1="110" x2="430" y2="235" stroke="#6366f1" stroke-width="3"
+              class="power-flow-active" />
+            <g class="cursor-pointer" onclick="toggleBreaker('T2')">
+              <rect id="brk-t2-box" x="416" y="158" width="28" height="28" rx="4" fill="#10b981" stroke="#064e3b"
+                stroke-width="2" />
+              <text x="454" y="176" fill="#cbd5e1" font-size="10" font-weight="600">ACB-T2</text>
+            </g>
+
+            <!-- Generator 1 (X=770) -->
+            <g class="cursor-pointer" onclick="switchTab('meters')">
+              <rect x="675" y="18" width="190" height="92" rx="10" fill="#111827" stroke="#f59e0b" stroke-width="1.5" />
+              <text x="770" y="38" text-anchor="middle" fill="#fcd34d" font-size="12" font-weight="700">GENERATOR 1
+                (PM-13)</text>
+              <text id="sld-g1-kw" x="770" y="62" text-anchor="middle" fill="#ffffff" font-size="16"
+                font-weight="700">0.0 kW</text>
+              <text id="sld-g1-sub" x="770" y="81" text-anchor="middle" fill="#94a3b8" font-size="11">STANDBY | PF
+                1.00</text>
+              <text id="sld-g1-v" x="770" y="98" text-anchor="middle" fill="#94a3b8" font-size="11">0.0 V | 0.0 A</text>
+            </g>
+            <line id="line-g1" x1="770" y1="110" x2="770" y2="235" stroke="#475569" stroke-width="3" />
+            <g class="cursor-pointer" onclick="toggleBreaker('G1')">
+              <rect id="brk-g1-box" x="756" y="158" width="28" height="28" rx="4" fill="#1e293b" stroke="#f43f5e"
+                stroke-width="2" />
+              <text x="794" y="176" fill="#cbd5e1" font-size="10" font-weight="600">ACB-G1</text>
+            </g>
+
+            <!-- Generator 2 (X=1040) -->
+            <g class="cursor-pointer" onclick="switchTab('meters')">
+              <rect x="945" y="18" width="190" height="92" rx="10" fill="#111827" stroke="#f59e0b" stroke-width="1.5" />
+              <text x="1040" y="38" text-anchor="middle" fill="#fcd34d" font-size="12" font-weight="700">GENERATOR 2
+                (PM-14)</text>
+              <text id="sld-g2-kw" x="1040" y="62" text-anchor="middle" fill="#ffffff" font-size="16"
+                font-weight="700">0.0 kW</text>
+              <text id="sld-g2-sub" x="1040" y="81" text-anchor="middle" fill="#94a3b8" font-size="11">STANDBY | PF
+                1.00</text>
+              <text id="sld-g2-v" x="1040" y="98" text-anchor="middle" fill="#94a3b8" font-size="11">0.0 V | 0.0
+                A</text>
+            </g>
+            <line id="line-g2" x1="1040" y1="110" x2="1040" y2="235" stroke="#475569" stroke-width="3" />
+            <g class="cursor-pointer" onclick="toggleBreaker('G2')">
+              <rect id="brk-g2-box" x="1026" y="158" width="28" height="28" rx="4" fill="#1e293b" stroke="#f43f5e"
+                stroke-width="2" />
+              <text x="1064" y="176" fill="#cbd5e1" font-size="10" font-weight="600">ACB-G2</text>
+            </g>
+
+            <!-- ==================== MAIN 400V AC BUSBAR ==================== -->
+            <rect x="55" y="235" width="1090" height="14" rx="4" fill="#0ea5e9" stroke="#38bdf8" stroke-width="1.5" />
+            <text x="600" y="226" text-anchor="middle" fill="#38bdf8" font-size="12" font-weight="700"
+              letter-spacing="1.5">
+              MAIN 400V AC DISTRIBUTION BUSBAR — <tspan id="sld-bus-freq">50.00 Hz</tspan> | TOTAL FACILITY LOAD: <tspan
+                id="sld-total-load">465.2 kW</tspan>
+            </text>
+
+            <!-- ==================== BOTTOM: 4 MEGAREVO MPS INVERTERS ==================== -->
+            <!-- Inverter 1 (X=160) -->
+            <line id="line-inv1" x1="160" y1="249" x2="160" y2="375" stroke="#10b981" stroke-width="3"
+              class="power-flow-reverse" />
+            <g class="cursor-pointer" onclick="toggleBreaker('INV1')">
+              <rect id="brk-inv1-box" x="146" y="300" width="28" height="28" rx="4" fill="#10b981" stroke="#064e3b"
+                stroke-width="2" />
+              <text x="184" y="318" fill="#cbd5e1" font-size="10" font-weight="600">MCCB-1</text>
+            </g>
+            <g class="cursor-pointer" onclick="switchTab('inverters')">
+              <rect x="65" y="375" width="190" height="142" rx="10" fill="#111827" stroke="#10b981"
+                stroke-width="1.5" />
+              <text x="160" y="396" text-anchor="middle" fill="#6ee7b7" font-size="12" font-weight="700">MEGAREVO MPS #1
+                (ID 1)</text>
+              <text id="sld-inv1-kw" x="160" y="420" text-anchor="middle" fill="#ffffff" font-size="16"
+                font-weight="700">+48.5 kW</text>
+              <text id="sld-inv1-mode" x="160" y="439" text-anchor="middle" fill="#34d399" font-size="11"
+                font-weight="600">ON-GRID | DISCHARGING</text>
+              <line x1="80" y1="450" x2="240" y2="450" stroke="#243049" stroke-width="1" />
+              <text id="sld-inv1-pv" x="160" y="468" text-anchor="middle" fill="#38bdf8" font-size="11">PV: 34.2 kW (642
+                V)</text>
+              <text id="sld-inv1-bat" x="160" y="486" text-anchor="middle" fill="#2dd4bf" font-size="11">BAT: 78% SOC
+                (532 V)</text>
+              <text id="sld-inv1-temp" x="160" y="504" text-anchor="middle" fill="#94a3b8" font-size="10">Temp: 41.2°C |
+                50.00 Hz</text>
+            </g>
+
+            <!-- Inverter 2 (X=430) -->
+            <line id="line-inv2" x1="430" y1="249" x2="430" y2="375" stroke="#10b981" stroke-width="3"
+              class="power-flow-reverse" />
+            <g class="cursor-pointer" onclick="toggleBreaker('INV2')">
+              <rect id="brk-inv2-box" x="416" y="300" width="28" height="28" rx="4" fill="#10b981" stroke="#064e3b"
+                stroke-width="2" />
+              <text x="454" y="318" fill="#cbd5e1" font-size="10" font-weight="600">MCCB-2</text>
+            </g>
+            <g class="cursor-pointer" onclick="switchTab('inverters')">
+              <rect x="335" y="375" width="190" height="142" rx="10" fill="#111827" stroke="#10b981"
+                stroke-width="1.5" />
+              <text x="430" y="396" text-anchor="middle" fill="#6ee7b7" font-size="12" font-weight="700">MEGAREVO MPS #2
+                (ID 2)</text>
+              <text id="sld-inv2-kw" x="430" y="420" text-anchor="middle" fill="#ffffff" font-size="16"
+                font-weight="700">+46.8 kW</text>
+              <text id="sld-inv2-mode" x="430" y="439" text-anchor="middle" fill="#34d399" font-size="11"
+                font-weight="600">ON-GRID | DISCHARGING</text>
+              <line x1="350" y1="450" x2="510" y2="450" stroke="#243049" stroke-width="1" />
+              <text id="sld-inv2-pv" x="430" y="468" text-anchor="middle" fill="#38bdf8" font-size="11">PV: 33.8 kW (638
+                V)</text>
+              <text id="sld-inv2-bat" x="430" y="486" text-anchor="middle" fill="#2dd4bf" font-size="11">BAT: 76% SOC
+                (530 V)</text>
+              <text id="sld-inv2-temp" x="430" y="504" text-anchor="middle" fill="#94a3b8" font-size="10">Temp: 40.8°C |
+                50.00 Hz</text>
+            </g>
+
+            <!-- Inverter 3 (X=770) -->
+            <line id="line-inv3" x1="770" y1="249" x2="770" y2="375" stroke="#10b981" stroke-width="3"
+              class="power-flow-reverse" />
+            <g class="cursor-pointer" onclick="toggleBreaker('INV3')">
+              <rect id="brk-inv3-box" x="756" y="300" width="28" height="28" rx="4" fill="#10b981" stroke="#064e3b"
+                stroke-width="2" />
+              <text x="794" y="318" fill="#cbd5e1" font-size="10" font-weight="600">MCCB-3</text>
+            </g>
+            <g class="cursor-pointer" onclick="switchTab('inverters')">
+              <rect x="675" y="375" width="190" height="142" rx="10" fill="#111827" stroke="#10b981"
+                stroke-width="1.5" />
+              <text x="770" y="396" text-anchor="middle" fill="#6ee7b7" font-size="12" font-weight="700">MEGAREVO MPS #3
+                (ID 3)</text>
+              <text id="sld-inv3-kw" x="770" y="420" text-anchor="middle" fill="#ffffff" font-size="16"
+                font-weight="700">+45.1 kW</text>
+              <text id="sld-inv3-mode" x="770" y="439" text-anchor="middle" fill="#34d399" font-size="11"
+                font-weight="600">ON-GRID | DISCHARGING</text>
+              <line x1="690" y1="450" x2="850" y2="450" stroke="#243049" stroke-width="1" />
+              <text id="sld-inv3-pv" x="770" y="468" text-anchor="middle" fill="#38bdf8" font-size="11">PV: 32.9 kW (635
+                V)</text>
+              <text id="sld-inv3-bat" x="770" y="486" text-anchor="middle" fill="#2dd4bf" font-size="11">BAT: 79% SOC
+                (533 V)</text>
+              <text id="sld-inv3-temp" x="770" y="504" text-anchor="middle" fill="#94a3b8" font-size="10">Temp: 42.1°C |
+                50.00 Hz</text>
+            </g>
+
+            <!-- Inverter 4 (X=1040) -->
+            <line id="line-inv4" x1="1040" y1="249" x2="1040" y2="375" stroke="#10b981" stroke-width="3"
+              class="power-flow-reverse" />
+            <g class="cursor-pointer" onclick="toggleBreaker('INV4')">
+              <rect id="brk-inv4-box" x="1026" y="300" width="28" height="28" rx="4" fill="#10b981" stroke="#064e3b"
+                stroke-width="2" />
+              <text x="1064" y="318" fill="#cbd5e1" font-size="10" font-weight="600">MCCB-4</text>
+            </g>
+            <g class="cursor-pointer" onclick="switchTab('inverters')">
+              <rect x="945" y="375" width="190" height="142" rx="10" fill="#111827" stroke="#10b981"
+                stroke-width="1.5" />
+              <text x="1040" y="396" text-anchor="middle" fill="#6ee7b7" font-size="12" font-weight="700">MEGAREVO MPS
+                #4 (ID 4)</text>
+              <text id="sld-inv4-kw" x="1040" y="420" text-anchor="middle" fill="#ffffff" font-size="16"
+                font-weight="700">+44.3 kW</text>
+              <text id="sld-inv4-mode" x="1040" y="439" text-anchor="middle" fill="#34d399" font-size="11"
+                font-weight="600">ON-GRID | DISCHARGING</text>
+              <line x1="960" y1="450" x2="1120" y2="450" stroke="#243049" stroke-width="1" />
+              <text id="sld-inv4-pv" x="1040" y="468" text-anchor="middle" fill="#38bdf8" font-size="11">PV: 32.1 kW
+                (631 V)</text>
+              <text id="sld-inv4-bat" x="1040" y="486" text-anchor="middle" fill="#2dd4bf" font-size="11">BAT: 77% SOC
+                (531 V)</text>
+              <text id="sld-inv4-temp" x="1040" y="504" text-anchor="middle" fill="#94a3b8" font-size="10">Temp: 39.9°C
+                | 50.00 Hz</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Real-Time Power Trend Chart & Energy Mix Summary -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="lg:col-span-2 bg-scada-panel border border-scada-border rounded-2xl p-4 sm:p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="text-sm sm:text-base font-bold text-white">Real-Time Active Power Trends (kW)</h3>
+              <p class="text-xs text-slate-400">Live telemetry history across PV, MPS Inverters, Transformers (T1+T2),
+                and Generators (G1+G2)</p>
+            </div>
+            <span class="px-2.5 py-1 rounded-lg bg-scada-bg border border-scada-border text-[11px] font-mono text-slate-300">
+              Rolling Window (40 samples)
+            </span>
+          </div>
+          <div class="h-64 sm:h-72 w-full">
+            <canvas id="powerTrendChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Source Contribution & Power Quality Summary -->
+        <div class="bg-scada-panel border border-scada-border rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+          <div>
+            <h3 class="text-sm sm:text-base font-bold text-white mb-1">Busbar Power Balance & Quality</h3>
+            <p class="text-xs text-slate-400 mb-4">Aggregated real-time active/reactive power & phase balance</p>
+
+            <div class="space-y-3.5">
+              <!-- Bar 1: Transformers -->
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-indigo-300 font-medium">Transformers (T1 + T2)</span>
+                  <span id="bal-tx-text" class="font-mono font-semibold text-white">280.5 kW (60%)</span>
+                </div>
+                <div class="w-full h-2 bg-scada-bg rounded-full overflow-hidden">
+                  <div id="bal-tx-bar" class="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                    style="width: 60%"></div>
+                </div>
+              </div>
+
+              <!-- Bar 2: Megarevo MPS Inverters -->
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-emerald-300 font-medium">Megarevo MPS (4× Units)</span>
+                  <span id="bal-inv-text" class="font-mono font-semibold text-white">184.7 kW (40%)</span>
+                </div>
+                <div class="w-full h-2 bg-scada-bg rounded-full overflow-hidden">
+                  <div id="bal-inv-bar" class="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                    style="width: 40%"></div>
+                </div>
+              </div>
+
+              <!-- Bar 3: Generators -->
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-amber-300 font-medium">Generators (G1 + G2)</span>
+                  <span id="bal-gen-text" class="font-mono font-semibold text-white">0.0 kW (0%)</span>
+                </div>
+                <div class="w-full h-2 bg-scada-bg rounded-full overflow-hidden">
+                  <div id="bal-gen-bar" class="h-full bg-amber-500 rounded-full transition-all duration-500"
+                    style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Electrical Summary Grid -->
+          <div class="grid grid-cols-2 gap-2.5 pt-4 mt-4 border-t border-scada-border text-xs">
+            <div class="bg-scada-bg p-2.5 rounded-xl border border-scada-border">
+              <div class="text-slate-400">Total Apparent Power</div>
+              <div id="bal-kva" class="text-sm font-mono font-bold text-slate-100 mt-0.5">482.4 kVA</div>
+            </div>
+            <div class="bg-scada-bg p-2.5 rounded-xl border border-scada-border">
+              <div class="text-slate-400">Total Reactive Power</div>
+              <div id="bal-kvar" class="text-sm font-mono font-bold text-slate-100 mt-0.5">+68.2 kVAr</div>
+            </div>
+            <div class="bg-scada-bg p-2.5 rounded-xl border border-scada-border">
+              <div class="text-slate-400">System Power Factor</div>
+              <div id="bal-pf" class="text-sm font-mono font-bold text-emerald-400 mt-0.5">0.964 PF</div>
+            </div>
+            <div class="bg-scada-bg p-2.5 rounded-xl border border-scada-border">
+              <div class="text-slate-400">Daily Solar Yield</div>
+              <div id="bal-yield" class="text-sm font-mono font-bold text-cyan-400 mt-0.5">642.8 kWh</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 2: MEGAREVO MPS INVERTERS (4 UNITS - SLAVE IDs 1 TO 4)          -->
+    <!-- =================================================================== -->
+    <section id="tab-inverters" class="hidden space-y-5">
+      <div
+        class="flex flex-wrap items-center justify-between gap-3 bg-scada-panel border border-scada-border rounded-2xl p-4">
+        <div>
+          <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="cpu" class="w-5 h-5 text-cyan-400"></i>
+            Megarevo MPS Hybrid / PCS Inverters (Units 1 – 4)
+          </h2>
+          <p class="text-xs text-slate-400">Polled via Modbus RTU over LTE Gateway (Slave IDs 1–4, 9600/19200 bps,
+            Holding/Input Registers)</p>
+        </div>
+        <div class="flex items-center gap-2 text-xs font-mono">
+          <span class="px-3 py-1.5 rounded-xl bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+            Total PV: <strong id="inv-tab-total-pv">0.0 kW</strong>
+          </span>
+          <span class="px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+            Total AC Out: <strong id="inv-tab-total-ac">0.0 kW</strong>
+          </span>
+        </div>
+      </div>
+
+      <!-- 4 Inverter Detailed Telemetry Cards -->
+      <div id="inverter-cards-grid" class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <!-- Populated dynamically by JS -->
+      </div>
+
+      <!-- Full Side-by-Side Comparison Parameter Table -->
+      <div class="bg-scada-panel border border-scada-border rounded-2xl overflow-hidden">
+        <div class="px-4 py-3 border-b border-scada-border flex items-center justify-between">
+          <h3 class="text-sm font-bold text-white">Complete Megarevo MPS Register Comparison Matrix</h3>
+          <span class="text-xs text-slate-400 font-mono">All 4 Units Side-by-Side</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs font-mono">
+            <thead>
+              <tr class="bg-scada-bg text-slate-400 border-b border-scada-border">
+                <th class="py-2.5 px-4 font-sans font-semibold">Telemetry Parameter</th>
+                <th class="py-2.5 px-3">Reg (Hex)</th>
+                <th class="py-2.5 px-4 text-cyan-300">MPS Inverter #1 (ID 1)</th>
+                <th class="py-2.5 px-4 text-cyan-300">MPS Inverter #2 (ID 2)</th>
+                <th class="py-2.5 px-4 text-cyan-300">MPS Inverter #3 (ID 3)</th>
+                <th class="py-2.5 px-4 text-cyan-300">MPS Inverter #4 (ID 4)</th>
+              </tr>
+            </thead>
+            <tbody id="inverter-matrix-body" class="divide-y divide-scada-border/60">
+              <!-- Populated dynamically by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 3: SCHNEIDER POWER METERS (T1, T2, G1, G2 - SLAVE IDs 11-14)    -->
+    <!-- =================================================================== -->
+    <section id="tab-meters" class="hidden space-y-5">
+      <div
+        class="flex flex-wrap items-center justify-between gap-3 bg-scada-panel border border-scada-border rounded-2xl p-4">
+        <div>
+          <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="gauge" class="w-5 h-5 text-indigo-400"></i>
+            Schneider Electric PowerLogic Meters (T1, T2, G1, G2)
+          </h2>
+          <p class="text-xs text-slate-400">3-Phase 4-Wire True RMS Power Quality & Revenue Metering (PM5100 / PM5300 /
+            PM2230 Series, IEEE 754 Float32)</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+          <span class="px-3 py-1.5 rounded-xl bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+            Transformers: <strong id="mtr-tab-tx">0.0 kW</strong>
+          </span>
+          <span class="px-3 py-1.5 rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30">
+            Generators: <strong id="mtr-tab-gen">0.0 kW</strong>
+          </span>
+        </div>
+      </div>
+
+      <!-- 4 Meter Summary Cards -->
+      <div id="meter-cards-grid" class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <!-- Populated dynamically by JS -->
+      </div>
+
+      <!-- Full 3-Phase Matrix Table for All 4 Schneider Meters -->
+      <div class="bg-scada-panel border border-scada-border rounded-2xl overflow-hidden">
+        <div class="px-4 py-3 border-b border-scada-border flex items-center justify-between">
+          <h3 class="text-sm font-bold text-white">Schneider PowerLogic Complete 3-Phase Telemetry Matrix</h3>
+          <span class="text-xs text-slate-400 font-mono">IEEE-754 Float32 Registers</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs font-mono">
+            <thead>
+              <tr class="bg-scada-bg text-slate-400 border-b border-scada-border">
+                <th class="py-2.5 px-4 font-sans font-semibold">Electrical Parameter</th>
+                <th class="py-2.5 px-3">Register</th>
+                <th class="py-2.5 px-4 text-indigo-300">Transformer 1 (ID 11)</th>
+                <th class="py-2.5 px-4 text-indigo-300">Transformer 2 (ID 12)</th>
+                <th class="py-2.5 px-4 text-amber-300">Generator 1 (ID 13)</th>
+                <th class="py-2.5 px-4 text-amber-300">Generator 2 (ID 14)</th>
+              </tr>
+            </thead>
+            <tbody id="meter-matrix-body" class="divide-y divide-scada-border/60">
+              <!-- Populated dynamically by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 4: MODBUS REGISTER MAP & TERMUX DEPLOYMENT GUIDE                -->
+    <!-- =================================================================== -->
+    <section id="tab-modbus" class="hidden space-y-5">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <!-- Architecture & Termux Deployment Guide -->
+        <div class="bg-scada-panel border border-scada-border rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="smartphone" class="w-5 h-5 text-emerald-400"></i>
+              Publish & Run on Android via Termux
+            </h2>
+            <button onclick="copyTermuxScript()" class="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-xs font-semibold text-emerald-300 flex items-center gap-1.5 transition">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              Copy Termux Script
+            </button>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Your LTE RTU Gateway (e.g., USR-G806, Teltonika TRB245, or Waveshare RS485-to-LTE) bridges RS485 Modbus RTU
+            from the 4 Megarevo MPS inverters and 4 Schneider PowerLogic meters over TCP/IP (VPN or Static IP). Run the
+            Python poller + web server below inside <strong>Termux</strong> to serve this dashboard and expose
+            <code>/api/telemetry</code>:
+          </p>
+
+          <div
+            class="bg-scada-bg border border-scada-border rounded-xl p-3.5 font-mono text-[11px] text-slate-200 overflow-x-auto leading-relaxed">
+            <pre id="termux-code-block"># 1. Update Termux & install Python + pure-Python pymodbus (no Rust build needed)
+pkg update -y && pkg upgrade -y
+pkg install python -y
+pip install pymodbus
+
+# 2. Save this dashboard as index.html in ~/scada/
+mkdir -p ~/scada && cd ~/scada
+
+# 3. Create zero-dependency server.py (polls LTE Gateway TCP 502 & serves UI on port 8085)
+cat << 'EOF' > ~/scada/server.py
+import json, struct
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pymodbus.client import ModbusTcpClient
+
+LTE_GATEWAY_IP = "10.8.0.12"  # Change to your LTE Gateway IP
+LTE_GATEWAY_PORT = 502
+
+class ReusableHTTPServer(ThreadingHTTPServer):
+    allow_reuse_address = True
+
+def read_float32(client, address, slave):
+    res = client.read_holding_registers(address=address, count=2, slave=slave)
+    if res.isError():
+        return None
+    raw = struct.pack(">HH", res.registers[0], res.registers[1])
+    return round(struct.unpack(">f", raw)[0], 2)
+
+def read_u16(client, address, slave, scale=1.0):
+    res = client.read_holding_registers(address=address, count=1, slave=slave)
+    if res.isError():
+        return None
+    return round(res.registers[0] * scale, 2)
+
+def poll_gateway():
+    client = ModbusTcpClient(LTE_GATEWAY_IP, port=LTE_GATEWAY_PORT, timeout=2)
+    if not client.connect():
+        return {"connected": False, "error": "LTE Gateway unreachable"}
+    data = {"connected": True, "inverters": {}, "meters": {}}
+    try:
+        for inv_id in range(1, 5):
+            data["inverters"][f"INV-{inv_id}"] = {
+                "p_kw": read_u16(client, 0x3026, inv_id, 0.1),
+                "q_kvar": read_u16(client, 0x3028, inv_id, 0.1),
+                "bat_v": read_u16(client, 0x3010, inv_id, 0.1),
+                "bat_soc": read_u16(client, 0x3013, inv_id, 1.0),
+                "pv_kw": read_u16(client, 0x3008, inv_id, 0.1),
+                "temp_c": read_u16(client, 0x3030, inv_id, 0.1),
+            }
+        for slave_id, name in {11: "T1", 12: "T2", 13: "G1", 14: "G2"}.items():
+            data["meters"][name] = {
+                "v_ll": read_float32(client, 3020, slave_id),
+                "i_avg": read_float32(client, 3000, slave_id),
+                "p_kw": read_float32(client, 3060, slave_id),
+                "q_kvar": read_float32(client, 3068, slave_id),
+                "s_kva": read_float32(client, 3076, slave_id),
+                "pf": read_float32(client, 3084, slave_id),
+                "freq": read_float32(client, 3110, slave_id),
+                "kwh_imp": read_float32(client, 3204, slave_id),
+            }
+    finally:
+        client.close()
+    return data
+
+class ScadaHandler(SimpleHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/api/telemetry":
+            payload = json.dumps(poll_gateway()).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(payload)
+        else:
+            super().do_GET()
+
+if __name__ == "__main__":
+    pkill_note = "Run: pkill -f python  # if restarting"
+    server = ReusableHTTPServer(("0.0.0.0", 8085), ScadaHandler)
+    print("in4solar SCADA Dashboard live at http://0.0.0.0:8085")
+    server.serve_forever()
+EOF
+
+# 4. Run on Port 8085 (Open http://localhost:8085 in your browser)
+python ~/scada/server.py</pre>
+          </div>
+        </div>
+
+        <!-- RS485 Daisy-Chain & Modbus Register Reference -->
+        <div class="bg-scada-panel border border-scada-border rounded-2xl p-5 space-y-4">
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="network" class="w-5 h-5 text-cyan-400"></i>
+            RS485 Bus Topology & Modbus Register Map
+          </h2>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div class="bg-scada-bg p-3 rounded-xl border border-scada-border">
+              <div class="font-bold text-cyan-300 mb-1">RS485 Port A: Megarevo MPS</div>
+              <ul class="space-y-1 text-slate-300 font-mono text-[11px]">
+                <li>• Baud: 9600 bps, 8N1</li>
+                <li>• MPS Unit 1: Slave ID 0x01 (1)</li>
+                <li>• MPS Unit 2: Slave ID 0x02 (2)</li>
+                <li>• MPS Unit 3: Slave ID 0x03 (3)</li>
+                <li>• MPS Unit 4: Slave ID 0x04 (4)</li>
+              </ul>
+            </div>
+            <div class="bg-scada-bg p-3 rounded-xl border border-scada-border">
+              <div class="font-bold text-indigo-300 mb-1">RS485 Port B: Schneider PM</div>
+              <ul class="space-y-1 text-slate-300 font-mono text-[11px]">
+                <li>• Baud: 19200 bps, 8E1</li>
+                <li>• Transformer 1: Slave ID 11</li>
+                <li>• Transformer 2: Slave ID 12</li>
+                <li>• Generator 1: Slave ID 13</li>
+                <li>• Generator 2: Slave ID 14</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Register Reference Table -->
+          <div class="overflow-x-auto border border-scada-border rounded-xl">
+            <table class="w-full text-left border-collapse text-xs font-mono">
+              <thead>
+                <tr class="bg-scada-bg text-slate-400 border-b border-scada-border">
+                  <th class="py-2 px-3 font-sans">Device Family</th>
+                  <th class="py-2 px-3">Address</th>
+                  <th class="py-2 px-3">Type</th>
+                  <th class="py-2 px-3 font-sans">Parameter & Scale</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-scada-border/60 text-[11px]">
+                <tr>
+                  <td class="py-2 px-3 text-cyan-300">Megarevo MPS</td>
+                  <td class="py-2 px-3">0x3000</td>
+                  <td class="py-2 px-3">UINT16</td>
+                  <td class="py-2 px-3 font-sans">Operating State (0=Standby, 1=OnGrid, 2=OffGrid, 3=Fault)</td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-3 text-cyan-300">Megarevo MPS</td>
+                  <td class="py-2 px-3">0x3004–0x3009</td>
+                  <td class="py-2 px-3">UINT16</td>
+                  <td class="py-2 px-3 font-sans">PV1 & PV2 Voltage (0.1V), Current (0.1A), Power (0.1kW)</td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-3 text-cyan-300">Megarevo MPS</td>
+                  <td class="py-2 px-3">0x3010–0x3015</td>
+                  <td class="py-2 px-3">INT16</td>
+                  <td class="py-2 px-3 font-sans">Battery V (0.1V), I (0.1A), P (0.1kW), SOC (1%), SOH (1%)</td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-3 text-cyan-300">Megarevo MPS</td>
+                  <td class="py-2 px-3">0x3020–0x302F</td>
+                  <td class="py-2 px-3">INT32</td>
+                  <td class="py-2 px-3 font-sans">Inverter L1/L2/L3 V, I, Active P (kW), Reactive Q (kVAr), Hz</td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-3 text-indigo-300">Schneider PM5xxx</td>
+                  <td class="py-2 px-3">3000–3010</td>
+                  <td class="py-2 px-3">FLOAT32</td>
+                  <td class="py-2 px-3 font-sans">Currents I_L1, I_L2, I_L3, I_N, I_Avg (Amps)</td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-3 text-indigo-300">Schneider PM5xxx</td>
+                  <td class="py-2 px-3">3020–3036</td>
+                  <td class="py-2 px-3">FLOAT32</td>
+                  <td class="py-2 px-3 font-sans">Voltages V_L12, V_L23, V_L31, V_L1N, V_L2N, V_L3N (Volts)</td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-3 text-indigo-300">Schneider PM5xxx</td>
+                  <td class="py-2 px-3">3054–3084</td>
+                  <td class="py-2 px-3">FLOAT32</td>
+                  <td class="py-2 px-3 font-sans">Active P (kW), Reactive Q (kVAr), Apparent S (kVA), PF Total</td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-3 text-indigo-300">Schneider PM5xxx</td>
+                  <td class="py-2 px-3">3110 / 2700</td>
+                  <td class="py-2 px-3">FLOAT32</td>
+                  <td class="py-2 px-3 font-sans">Frequency (Hz) & Total Active Energy Import/Export (kWh)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 5: ALARMS & EVENT LOG                                           -->
+    <!-- =================================================================== -->
+    <section id="tab-alarms" class="hidden space-y-4">
+      <div
+        class="bg-scada-panel border border-scada-border rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="shield-alert" class="w-5 h-5 text-amber-400"></i>
+            Substation Event & Alarm Journal
+          </h2>
+          <p class="text-xs text-slate-400">Real-time breaker operations, inverter state transitions, and LTE gateway
+            communication logs</p>
+        </div>
+        <button onclick="clearAlarms()" class="px-3 py-1.5 rounded-xl bg-scada-card hover:bg-scada-highlight border border-scada-border text-xs font-semibold text-slate-200 transition">
+          Acknowledge & Clear Log
+        </button>
+      </div>
+
+      <div class="bg-scada-panel border border-scada-border rounded-2xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-scada-bg text-slate-400 border-b border-scada-border">
+                <th class="py-3 px-4">Timestamp</th>
+                <th class="py-3 px-4">Severity</th>
+                <th class="py-3 px-4">Source Device</th>
+                <th class="py-3 px-4">Event / Register Description</th>
+                <th class="py-3 px-4">Status</th>
+              </tr>
+            </thead>
+            <tbody id="alarm-table-body" class="divide-y divide-scada-border/60 font-mono">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- =================================================================== -->
+  <!-- MODAL: LTE GATEWAY & MODBUS TCP ENDPOINT CONFIGURATION              -->
+  <!-- =================================================================== -->
+  <div id="gateway-modal"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+    <div class="bg-scada-panel border border-scada-border rounded-2xl max-w-lg w-full p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-scada-border pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="router" class="w-5 h-5 text-amber-400"></i>
+          LTE Gateway & Termux API Settings
+        </h3>
+        <button onclick="closeGatewayModal()" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">LTE RTU Gateway Modbus TCP IP / Hostname</label>
+          <input id="cfg-gw-ip" type="text" value="10.8.0.12" class="w-full bg-scada-bg border border-scada-border rounded-xl px-3 py-2 font-mono text-white focus:outline-none focus:border-cyan-500" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-medium mb-1">Modbus TCP Port</label>
+            <input id="cfg-gw-port" type="number" value="502" class="w-full bg-scada-bg border border-scada-border rounded-xl px-3 py-2 font-mono text-white focus:outline-none focus:border-cyan-500" />
+          </div>
+          <div>
+            <label class="block text-slate-300 font-medium mb-1">RS485 Timeout (ms)</label>
+            <input id="cfg-gw-timeout" type="number" value="1500" class="w-full bg-scada-bg border border-scada-border rounded-xl px-3 py-2 font-mono text-white focus:outline-none focus:border-cyan-500" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">Termux FastAPI / Flask Telemetry Endpoint URL</label>
+          <input id="cfg-api-url" type="text" value="/api/telemetry" class="w-full bg-scada-bg border border-scada-border rounded-xl px-3 py-2 font-mono text-white focus:outline-none focus:border-cyan-500" />
+          <p class="text-[11px] text-slate-400 mt-1">When running in LIVE LTE API mode, the dashboard fetches JSON
+            telemetry from this endpoint.</p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-scada-border">
+        <button onclick="closeGatewayModal()" class="px-4 py-2 rounded-xl bg-scada-card hover:bg-scada-highlight text-xs font-semibold text-slate-300 transition">
+          Cancel
+        </button>
+        <button onclick="saveGatewayConfig()" class="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold transition">
+          Apply & Save Config
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- JAVASCRIPT TELEMETRY ENGINE, SIMULATION & UI RENDERER               -->
+  <!-- =================================================================== -->
+  <script>
+    // =========================================================================
+    // 1. GLOBAL APPLICATION STATE
+    // =========================================================================
+    const state = {
+      mode: 'SIM', // 'SIM' or 'LIVE'
+      scenario: 'NORMAL', // 'NORMAL', 'GEN_BACKUP', 'PEAK_SHAVE'
+      pollIntervalMs: 2000,
+      pollTimer: null,
+      gateway: {
+        ip: '10.8.0.12',
+        port: 502,
+        timeout: 1500,
+        apiUrl: '/api/telemetry'
+      },
+      breakers: {
+        T1: true,
+        T2: true,
+        G1: false,
+        G2: false,
+        INV1: true,
+        INV2: true,
+        INV3: true,
+        INV4: true
+      },
+      inverters: [],
+      meters: [],
+      alarms: [
+        {
+          time: new Date(Date.now() - 3600 * 1000 * 2).toLocaleTimeString(),
+          severity: 'INFO',
+          source: 'LTE Gateway (10.8.0.12)',
+          message: 'Modbus TCP tunnel established with RS485 bus (8 slaves online)',
+          status: 'ACTIVE'
+        },
+        {
+          time: new Date(Date.now() - 1800 * 1000).toLocaleTimeString(),
+          severity: 'INFO',
+          source: 'Megarevo MPS #1–#4',
+          message: 'Parallel droop & grid-support synchronization verified (50.00 Hz)',
+          status: 'ACTIVE'
+        }
+      ],
+      chartHistory: {
+        labels: [],
+        pv: [],
+        inv: [],
+        tx: [],
+        gen: []
+      }
+    };
+
+    let trendChart = null;
+
+    // =========================================================================
+    // 2. INITIALIZE DATA STRUCTURES FOR 4 INVERTERS & 4 POWER METERS
+    // =========================================================================
+    function initDevices() {
+      // 4 Megarevo MPS Inverters (Slave IDs 1..4)
+      state.inverters = [1, 2, 3, 4].map(id => ({
+        id,
+        slaveId: id,
+        name: `Megarevo MPS #${id}`,
+        model: 'MPS-100kW Hybrid PCS',
+        state: 'ON-GRID',
+        faultCode: '0x0000 (None)',
+        pv1V: 640 + id * 1.5,
+        pv1A: 26.5,
+        pv1Kw: 17.0,
+        pv2V: 636 + id * 1.2,
+        pv2A: 25.8,
+        pv2Kw: 16.4,
+        pvTotalKw: 33.4,
+        batV: 531.5 + id * 0.4,
+        batA: -28.0, // Negative = discharging
+        batKw: 14.9,
+        soc: 78 - id,
+        soh: 99,
+        bmsTemp: 28.5 + id * 0.3,
+        gridVL1: 231.2,
+        gridVL2: 230.8,
+        gridVL3: 231.5,
+        invVL1: 231.4,
+        invVL2: 231.0,
+        invVL3: 231.6,
+        invIL1: 68.2,
+        invIL2: 67.9,
+        invIL3: 68.5,
+        activeKw: 47.2,
+        reactiveKvar: 3.1,
+        apparentKva: 47.3,
+        pf: 0.99,
+        freq: 50.00,
+        heatsinkTemp: 40.5 + id * 0.4,
+        dailyYieldKwh: 158.4 + id * 3.1,
+        totalYieldMwh: 42.8 + id * 1.4
+      }));
+
+      // 4 Schneider Electric PowerLogic Meters (Slave IDs 11..14)
+      const meterConfigs = [
+        { id: 1, slaveId: 11, name: 'Transformer 1', tag: 'TX-01', type: 'TRANSFORMER', model: 'PM5340', ratingKva: 500, energyImport: 184520.4, energyExport: 1240.2 },
+        { id: 2, slaveId: 12, name: 'Transformer 2', tag: 'TX-02', type: 'TRANSFORMER', model: 'PM5340', ratingKva: 500, energyImport: 179840.8, energyExport: 980.5 },
+        { id: 3, slaveId: 13, name: 'Generator 1',   tag: 'GEN-01', type: 'GENERATOR',   model: 'PM5110', ratingKva: 400, energyImport: 24110.6,  energyExport: 0.0 },
+        { id: 4, slaveId: 14, name: 'Generator 2',   tag: 'GEN-02', type: 'GENERATOR',   model: 'PM5110', ratingKva: 400, energyImport: 22950.1,  energyExport: 0.0 }
+      ];
+
+      state.meters = meterConfigs.map(cfg => ({
+        ...cfg,
+        online: true,
+        vL1N: 231.2, vL2N: 230.9, vL3N: 231.5, vLNAvg: 231.2,
+        vL12: 400.5, vL23: 400.1, vL31: 400.8, vLLAvg: 400.5,
+        iL1: 205.4, iL2: 203.8, iL3: 206.1, iN: 4.2, iAvg: 205.1,
+        kwL1: 46.2, kwL2: 45.8, kwL3: 46.5, kwTotal: 138.5,
+        kvarTotal: 32.4,
+        kvaTotal: 142.2,
+        pfL1: 0.97, pfL2: 0.97, pfL3: 0.98, pfTotal: 0.974,
+        freq: 50.00,
+        thdV: 1.8,
+        thdI: 3.4,
+        kvarhTotal: 41250.0,
+        demandPeakKw: 215.4
+      }));
+    }
+
+    // =========================================================================
+    // 3. TELEMETRY SIMULATION & LIVE POLLING ENGINE
+    // =========================================================================
+    function jitter(base, range) {
+      return base + (Math.random() - 0.5) * 2 * range;
+    }
+
+    async function pollTelemetry() {
+      const nowStr = new Date().toLocaleTimeString();
+      document.getElementById('hdr-last-poll').textContent = nowStr;
+
+      if (state.mode === 'LIVE') {
+        try {
+          const res = await fetch(state.gateway.apiUrl, { cache: 'no-store' });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          if (data && Array.isArray(data.inverters) && data.inverters.length === 4) {
+            state.inverters = data.inverters;
+          }
+          if (data && Array.isArray(data.meters) && data.meters.length === 4) {
+            state.meters = data.meters;
+          }
+          document.getElementById('live-status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400 live-dot';
+        } catch (err) {
+          document.getElementById('live-status-dot').className = 'w-2 h-2 rounded-full bg-rose-500';
+          // Fallback softly without spamming toast every 2s
+          console.warn('Live LTE API unreachable, awaiting Termux backend:', err.message);
+        }
+      } else {
+        simulateTick();
+      }
+
+      updateUI();
+    }
+
+    function simulateTick() {
+      const busFreq = jitter(50.00, 0.03);
+      const baseVln = jitter(231.2, 0.8);
+      const baseVll = baseVln * 1.73205;
+
+      // Facility total load ~ 450 - 485 kW
+      const totalFacilityLoad = jitter(465, 12);
+
+      // Inverter target output based on scenario
+      let targetInvEach = 46.0;
+      if (state.scenario === 'PEAK_SHAVE') targetInvEach = 78.0;
+      if (state.scenario === 'GEN_BACKUP') targetInvEach = 52.0;
+
+      let activeInvCount = 0;
+      let totalInvKw = 0;
+
+      // Update 4 Megarevo MPS Inverters
+      state.inverters.forEach((inv, idx) => {
+        const brkClosed = state.breakers[`INV${inv.id}`];
+        inv.freq = busFreq;
+
+        // PV generation (daytime curve)
+        inv.pv1V = jitter(640 + idx * 1.5, 2.5);
+        inv.pv1A = jitter(26.5, 0.9);
+        inv.pv1Kw = +(inv.pv1V * inv.pv1A / 1000).toFixed(2);
+
+        inv.pv2V = jitter(636 + idx * 1.2, 2.5);
+        inv.pv2A = jitter(25.8, 0.9);
+        inv.pv2Kw = +(inv.pv2V * inv.pv2A / 1000).toFixed(2);
+
+        inv.pvTotalKw = +(inv.pv1Kw + inv.pv2Kw).toFixed(2);
+
+        if (!brkClosed) {
+          inv.state = 'STANDBY (OPEN)';
+          inv.activeKw = 0.0;
+          inv.reactiveKvar = 0.0;
+          inv.apparentKva = 0.0;
+          inv.invIL1 = 0; inv.invIL2 = 0; inv.invIL3 = 0;
+          // PV charges battery when AC breaker is open
+          inv.batKw = +(inv.pvTotalKw * 0.96).toFixed(2);
+          inv.batA = +(inv.batKw * 1000 / inv.batV).toFixed(1);
+          inv.soc = Math.min(100, +(inv.soc + 0.01).toFixed(2));
+        } else {
+          activeInvCount++;
+          inv.state = state.scenario === 'GEN_BACKUP' ? 'OFF-GRID / V-F' : 'ON-GRID';
+          inv.activeKw = +jitter(targetInvEach, 1.8).toFixed(2);
+          inv.reactiveKvar = +jitter(3.2, 0.6).toFixed(2);
+          inv.apparentKva = +Math.hypot(inv.activeKw, inv.reactiveKvar).toFixed(2);
+          inv.pf = +(inv.activeKw / Math.max(0.1, inv.apparentKva)).toFixed(3);
+
+          inv.invVL1 = +jitter(baseVln, 0.4).toFixed(1);
+          inv.invVL2 = +jitter(baseVln - 0.3, 0.4).toFixed(1);
+          inv.invVL3 = +jitter(baseVln + 0.4, 0.4).toFixed(1);
+
+          const phaseI = (inv.apparentKva * 1000) / (3 * baseVln);
+          inv.invIL1 = +jitter(phaseI, 0.7).toFixed(1);
+          inv.invIL2 = +jitter(phaseI * 0.99, 0.7).toFixed(1);
+          inv.invIL3 = +jitter(phaseI * 1.01, 0.7).toFixed(1);
+
+          // Battery power = AC Out - PV In
+          const netBatKw = inv.activeKw - inv.pvTotalKw;
+          inv.batKw = +netBatKw.toFixed(2);
+          inv.batV = +jitter(531.5 - netBatKw * 0.08, 0.3).toFixed(1);
+          inv.batA = +(-netBatKw * 1000 / inv.batV).toFixed(1);
+          inv.soc = Math.max(15, Math.min(100, +(inv.soc - netBatKw * 0.0004).toFixed(2)));
+        }
+
+        inv.gridVL1 = +jitter(baseVln, 0.5).toFixed(1);
+        inv.gridVL2 = +jitter(baseVln - 0.2, 0.5).toFixed(1);
+        inv.gridVL3 = +jitter(baseVln + 0.3, 0.5).toFixed(1);
+        inv.heatsinkTemp = +jitter(39.5 + inv.activeKw * 0.06, 0.3).toFixed(1);
+        inv.dailyYieldKwh = +(inv.dailyYieldKwh + inv.pvTotalKw * (state.pollIntervalMs / 3600000)).toFixed(2);
+        totalInvKw += inv.activeKw;
+      });
+
+      // Remaining load supplied by Transformers (T1, T2) and/or Generators (G1, G2)
+      const remainingLoad = Math.max(0, totalFacilityLoad - totalInvKw);
+      const activeTx = (state.breakers.T1 ? 1 : 0) + (state.breakers.T2 ? 1 : 0);
+      const activeGen = (state.breakers.G1 ? 1 : 0) + (state.breakers.G2 ? 1 : 0);
+
+      state.meters.forEach(m => {
+        const isClosed = (m.id === 1 && state.breakers.T1) ||
+                         (m.id === 2 && state.breakers.T2) ||
+                         (m.id === 3 && state.breakers.G1) ||
+                         (m.id === 4 && state.breakers.G2);
+
+        if (!isClosed) {
+          m.online = false;
+          m.vL1N = 0; m.vL2N = 0; m.vL3N = 0; m.vLNAvg = 0;
+          m.vL12 = 0; m.vL23 = 0; m.vL31 = 0; m.vLLAvg = 0;
+          m.iL1 = 0; m.iL2 = 0; m.iL3 = 0; m.iN = 0; m.iAvg = 0;
+          m.kwL1 = 0; m.kwL2 = 0; m.kwL3 = 0; m.kwTotal = 0;
+          m.kvarTotal = 0; m.kvaTotal = 0; m.pfTotal = 1.00;
+          m.freq = 0.00; m.thdV = 0.0; m.thdI = 0.0;
+          return;
+        }
+
+        m.online = true;
+        let shareKw = 0;
+        if (m.type === 'TRANSFORMER' && activeTx > 0) {
+          shareKw = (activeGen > 0 ? remainingLoad * 0.5 : remainingLoad) / activeTx;
+        } else if (m.type === 'GENERATOR' && activeGen > 0) {
+          shareKw = (activeTx > 0 ? remainingLoad * 0.5 : remainingLoad) / activeGen;
+        }
+
+        m.kwTotal = +jitter(shareKw, 2.2).toFixed(2);
+        m.kwL1 = +(m.kwTotal * 0.335).toFixed(2);
+        m.kwL2 = +(m.kwTotal * 0.331).toFixed(2);
+        m.kwL3 = +(m.kwTotal * 0.334).toFixed(2);
+
+        const pfTarget = m.type === 'TRANSFORMER' ? jitter(0.965, 0.008) : jitter(0.925, 0.01);
+        m.pfTotal = +pfTarget.toFixed(3);
+        m.pfL1 = +(pfTarget + 0.003).toFixed(3);
+        m.pfL2 = +(pfTarget - 0.002).toFixed(3);
+        m.pfL3 = +(pfTarget + 0.001).toFixed(3);
+
+        m.kvaTotal = +(m.kwTotal / Math.max(0.5, m.pfTotal)).toFixed(2);
+        m.kvarTotal = +Math.sqrt(Math.max(0, m.kvaTotal ** 2 - m.kwTotal ** 2)).toFixed(2);
+
+        m.vL1N = +jitter(baseVln, 0.5).toFixed(1);
+        m.vL2N = +jitter(baseVln - 0.3, 0.5).toFixed(1);
+        m.vL3N = +jitter(baseVln + 0.4, 0.5).toFixed(1);
+        m.vLNAvg = +((m.vL1N + m.vL2N + m.vL3N) / 3).toFixed(1);
+
+        m.vL12 = +jitter(baseVll, 0.8).toFixed(1);
+        m.vL23 = +jitter(baseVll - 0.4, 0.8).toFixed(1);
+        m.vL31 = +jitter(baseVll + 0.5, 0.8).toFixed(1);
+        m.vLLAvg = +((m.vL12 + m.vL23 + m.vL31) / 3).toFixed(1);
+
+        const avgI = (m.kvaTotal * 1000) / (1.73205 * Math.max(1, m.vLLAvg));
+        m.iL1 = +jitter(avgI * 1.01, 1.2).toFixed(1);
+        m.iL2 = +jitter(avgI * 0.99, 1.2).toFixed(1);
+        m.iL3 = +jitter(avgI * 1.00, 1.2).toFixed(1);
+        m.iAvg = +((m.iL1 + m.iL2 + m.iL3) / 3).toFixed(1);
+        m.iN = +jitter(avgI * 0.025, 0.4).toFixed(1);
+
+        m.freq = +busFreq.toFixed(2);
+        m.thdV = +jitter(m.type === 'GENERATOR' ? 2.6 : 1.7, 0.15).toFixed(2);
+        m.thdI = +jitter(m.type === 'GENERATOR' ? 4.8 : 3.2, 0.25).toFixed(2);
+        m.energyImport = +(m.energyImport + m.kwTotal * (state.pollIntervalMs / 3600000)).toFixed(2);
+        m.kvarhTotal = +(m.kvarhTotal + m.kvarTotal * (state.pollIntervalMs / 3600000)).toFixed(2);
+        if (m.kwTotal > m.demandPeakKw) m.demandPeakKw = m.kwTotal;
+      });
+    }
+
+    // =========================================================================
+    // 4. UPDATE ALL UI VIEWS (KPIs, SLD, CHARTS, INVERTERS, METERS, ALARMS)
+    // =========================================================================
+    function updateUI() {
+      const totalPvKw = state.inverters.reduce((sum, i) => sum + i.pvTotalKw, 0);
+      const totalInvKw = state.inverters.reduce((sum, i) => sum + i.activeKw, 0);
+      const totalInvKva = state.inverters.reduce((sum, i) => sum + i.apparentKva, 0);
+      const totalInvKvar = state.inverters.reduce((sum, i) => sum + i.reactiveKvar, 0);
+      const avgSoc = state.inverters.reduce((sum, i) => sum + i.soc, 0) / 4;
+      const totalYield = state.inverters.reduce((sum, i) => sum + i.dailyYieldKwh, 0);
+
+      const txMeters = state.meters.filter(m => m.type === 'TRANSFORMER');
+      const genMeters = state.meters.filter(m => m.type === 'GENERATOR');
+      const totalTxKw = txMeters.reduce((sum, m) => sum + m.kwTotal, 0);
+      const totalGenKw = genMeters.reduce((sum, m) => sum + m.kwTotal, 0);
+      const totalMeterKva = state.meters.reduce((sum, m) => sum + m.kvaTotal, 0);
+      const totalMeterKvar = state.meters.reduce((sum, m) => sum + m.kvarTotal, 0);
+
+      const busFreq = state.inverters[0]?.freq || 50.00;
+      const totalBusLoad = totalInvKw + totalTxKw + totalGenKw;
+
+      // Update Top KPI Strip
+      document.getElementById('kpi-pv-kw').textContent = totalPvKw.toFixed(1);
+      document.getElementById('kpi-inv-kw').textContent = totalInvKw.toFixed(1);
+      document.getElementById('kpi-tx-kw').textContent = totalTxKw.toFixed(1);
+      document.getElementById('kpi-gen-kw').textContent = totalGenKw.toFixed(1);
+      document.getElementById('kpi-soc').textContent = avgSoc.toFixed(1);
+      document.getElementById('kpi-freq').textContent = busFreq.toFixed(2);
+
+      // Tab sub-badges
+      document.getElementById('inv-tab-total-pv').textContent = `${totalPvKw.toFixed(1)} kW`;
+      document.getElementById('inv-tab-total-ac').textContent = `${totalInvKw.toFixed(1)} kW`;
+      document.getElementById('mtr-tab-tx').textContent = `${totalTxKw.toFixed(1)} kW`;
+      document.getElementById('mtr-tab-gen').textContent = `${totalGenKw.toFixed(1)} kW`;
+
+      // Update Single-Line Diagram SVG
+      updateSingleLineSVG(busFreq, totalBusLoad);
+
+      // Update Busbar Power Balance Panel
+      const safeTotal = Math.max(0.1, totalBusLoad);
+      const txPct = Math.round((totalTxKw / safeTotal) * 100);
+      const invPct = Math.round((totalInvKw / safeTotal) * 100);
+      const genPct = Math.round((totalGenKw / safeTotal) * 100);
+
+      document.getElementById('bal-tx-text').textContent = `${totalTxKw.toFixed(1)} kW (${txPct}%)`;
+      document.getElementById('bal-tx-bar').style.width = `${txPct}%`;
+      document.getElementById('bal-inv-text').textContent = `${totalInvKw.toFixed(1)} kW (${invPct}%)`;
+      document.getElementById('bal-inv-bar').style.width = `${invPct}%`;
+      document.getElementById('bal-gen-text').textContent = `${totalGenKw.toFixed(1)} kW (${genPct}%)`;
+      document.getElementById('bal-gen-bar').style.width = `${genPct}%`;
+
+      const totKva = totalInvKva + totalMeterKva;
+      const totKvar = totalInvKvar + totalMeterKvar;
+      const sysPf = totKva > 0 ? (totalBusLoad / totKva) : 1.0;
+
+      document.getElementById('bal-kva').textContent = `${totKva.toFixed(1)} kVA`;
+      document.getElementById('bal-kvar').textContent = `+${totKvar.toFixed(1)} kVAr`;
+      document.getElementById('bal-pf').textContent = `${sysPf.toFixed(3)} PF`;
+      document.getElementById('bal-yield').textContent = `${totalYield.toFixed(1)} kWh`;
+
+      // Update Trend Chart
+      pushChartPoint(totalPvKw, totalInvKw, totalTxKw, totalGenKw);
+
+      // Render Inverter & Meter Views
+      renderInvertersTab();
+      renderMetersTab();
+      renderAlarmsTab();
+    }
+
+    function updateSingleLineSVG(busFreq, totalBusLoad) {
+      document.getElementById('sld-bus-freq').textContent = `${busFreq.toFixed(2)} Hz`;
+      document.getElementById('sld-total-load').textContent = `${totalBusLoad.toFixed(1)} kW`;
+
+      // Meters: T1 (0), T2 (1), G1 (2), G2 (3)
+      const mIds = ['t1', 't2', 'g1', 'g2'];
+      const brkKeys = ['T1', 'T2', 'G1', 'G2'];
+      state.meters.forEach((m, idx) => {
+        const key = mIds[idx];
+        const isClosed = state.breakers[brkKeys[idx]];
+        const strokeColor = m.type === 'TRANSFORMER' ? '#6366f1' : '#f59e0b';
+
+        document.getElementById(`sld-${key}-kw`).textContent = `${m.kwTotal.toFixed(1)} kW`;
+        document.getElementById(`sld-${key}-sub`).textContent = m.online
+          ? `${m.kvaTotal.toFixed(1)} kVA | PF ${m.pfTotal.toFixed(2)}`
+          : 'BREAKER OPEN | STANDBY';
+        document.getElementById(`sld-${key}-v`).textContent = m.online
+          ? `${m.vLLAvg.toFixed(1)} V | ${m.iAvg.toFixed(1)} A`
+          : '0.0 V | 0.0 A';
+        document.getElementById(`sld-${key}-v`).setAttribute('fill', m.online ? '#34d399' : '#64748b');
+
+        const lineEl = document.getElementById(`line-${key}`);
+        const brkBox = document.getElementById(`brk-${key}-box`);
+        if (isClosed) {
+          lineEl.setAttribute('stroke', strokeColor);
+          lineEl.classList.add('power-flow-active');
+          brkBox.setAttribute('fill', '#10b981');
+          brkBox.setAttribute('stroke', '#064e3b');
+        } else {
+          lineEl.setAttribute('stroke', '#334155');
+          lineEl.classList.remove('power-flow-active');
+          brkBox.setAttribute('fill', '#1e293b');
+          brkBox.setAttribute('stroke', '#f43f5e');
+        }
+      });
+
+      // Inverters: INV1..INV4
+      state.inverters.forEach((inv, idx) => {
+        const num = idx + 1;
+        const isClosed = state.breakers[`INV${num}`];
+        document.getElementById(`sld-inv${num}-kw`).textContent = `${inv.activeKw >= 0 ? '+' : ''}${inv.activeKw.toFixed(1)} kW`;
+        document.getElementById(`sld-inv${num}-mode`).textContent = inv.state;
+        document.getElementById(`sld-inv${num}-mode`).setAttribute('fill', isClosed ? '#34d399' : '#f59e0b');
+        document.getElementById(`sld-inv${num}-pv`).textContent = `PV: ${inv.pvTotalKw.toFixed(1)} kW (${((inv.pv1V + inv.pv2V)/2).toFixed(0)} V)`;
+        document.getElementById(`sld-inv${num}-bat`).textContent = `BAT: ${inv.soc.toFixed(0)}% SOC (${inv.batV.toFixed(0)} V)`;
+        document.getElementById(`sld-inv${num}-temp`).textContent = `Temp: ${inv.heatsinkTemp.toFixed(1)}°C | ${inv.freq.toFixed(2)} Hz`;
+
+        const lineEl = document.getElementById(`line-inv${num}`);
+        const brkBox = document.getElementById(`brk-inv${num}-box`);
+        if (isClosed) {
+          lineEl.setAttribute('stroke', '#10b981');
+          lineEl.classList.add('power-flow-reverse');
+          brkBox.setAttribute('fill', '#10b981');
+          brkBox.setAttribute('stroke', '#064e3b');
+        } else {
+          lineEl.setAttribute('stroke', '#334155');
+          lineEl.classList.remove('power-flow-reverse');
+          brkBox.setAttribute('fill', '#1e293b');
+          brkBox.setAttribute('stroke', '#f43f5e');
+        }
+      });
+    }
+
+    // =========================================================================
+    // 5. RENDER MEGAREVO MPS INVERTERS TAB
+    // =========================================================================
+    function renderInvertersTab() {
+      const grid = document.getElementById('inverter-cards-grid');
+      grid.innerHTML = state.inverters.map(inv => {
+        const isClosed = state.breakers[`INV${inv.id}`];
+        const statusClass = isClosed
+          ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+          : 'bg-amber-500/15 text-amber-300 border-amber-500/40';
+
+        return `
+          <div class="bg-scada-panel border border-scada-border rounded-2xl p-4 sm:p-5 space-y-4 shadow-md">
+            <!-- Card Header -->
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-scada-border pb-3">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono text-xs font-bold">SLAVE ID ${inv.slaveId}</span>
+                  <h3 class="text-base font-bold text-white">${inv.name}</h3>
+                </div>
+                <p class="text-xs text-slate-400 mt-0.5">${inv.model} • Heatsink: <span class="font-mono text-slate-200">${inv.heatsinkTemp.toFixed(1)}°C</span> • Fault: <span class="font-mono text-emerald-400">${inv.faultCode}</span></p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-1 rounded-xl border text-xs font-mono font-bold ${statusClass}">${inv.state}</span>
+                <button onclick="toggleBreaker('INV${inv.id}')" class="px-2.5 py-1 rounded-xl bg-scada-card hover:bg-scada-highlight border border-scada-border text-xs font-semibold text-slate-200 transition">
+                  ${isClosed ? 'Open MCCB' : 'Close MCCB'}
+                </button>
+              </div>
+            </div>
+
+            <!-- 3 Subsystem Blocks: PV Strings, Battery BESS, AC Output -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <!-- PV Input -->
+              <div class="bg-scada-bg border border-scada-border rounded-xl p-3 space-y-1.5">
+                <div class="text-cyan-400 font-bold flex items-center justify-between">
+                  <span>PV MPPT 1 & 2</span>
+                  <span class="font-mono">${inv.pvTotalKw.toFixed(2)} kW</span>
+                </div>
+                <div class="flex justify-between text-slate-400"><span>MPPT 1:</span><span class="font-mono text-slate-200">${inv.pv1V.toFixed(1)}V / ${inv.pv1A.toFixed(1)}A</span></div>
+                <div class="flex justify-between text-slate-400"><span>MPPT 2:</span><span class="font-mono text-slate-200">${inv.pv2V.toFixed(1)}V / ${inv.pv2A.toFixed(1)}A</span></div>
+                <div class="flex justify-between text-slate-400"><span>Daily Yield:</span><span class="font-mono text-cyan-300">${inv.dailyYieldKwh.toFixed(1)} kWh</span></div>
+              </div>
+
+              <!-- Battery Bank -->
+              <div class="bg-scada-bg border border-scada-border rounded-xl p-3 space-y-1.5">
+                <div class="text-teal-400 font-bold flex items-center justify-between">
+                  <span>HV BATTERY</span>
+                  <span class="font-mono">${inv.soc.toFixed(1)}% SOC</span>
+                </div>
+                <div class="flex justify-between text-slate-400"><span>DC Bus:</span><span class="font-mono text-slate-200">${inv.batV.toFixed(1)} V</span></div>
+                <div class="flex justify-between text-slate-400"><span>Current / Pwr:</span><span class="font-mono text-slate-200">${inv.batA.toFixed(1)}A / ${inv.batKw.toFixed(1)}kW</span></div>
+                <div class="flex justify-between text-slate-400"><span>SOH / BMS:</span><span class="font-mono text-teal-300">${inv.soh}% / ${inv.bmsTemp.toFixed(1)}°C</span></div>
+              </div>
+
+              <!-- AC Inverter Output -->
+              <div class="bg-scada-bg border border-scada-border rounded-xl p-3 space-y-1.5">
+                <div class="text-emerald-400 font-bold flex items-center justify-between">
+                  <span>AC 3-PHASE</span>
+                  <span class="font-mono">${inv.activeKw.toFixed(2)} kW</span>
+                </div>
+                <div class="flex justify-between text-slate-400"><span>kVA / kVAr:</span><span class="font-mono text-slate-200">${inv.apparentKva.toFixed(1)} / ${inv.reactiveKvar.toFixed(1)}</span></div>
+                <div class="flex justify-between text-slate-400"><span>PF / Freq:</span><span class="font-mono text-slate-200">${inv.pf.toFixed(2)} / ${inv.freq.toFixed(2)}Hz</span></div>
+                <div class="flex justify-between text-slate-400"><span>Total Yield:</span><span class="font-mono text-emerald-300">${inv.totalYieldMwh.toFixed(2)} MWh</span></div>
+              </div>
+            </div>
+
+            <!-- Phase L1 / L2 / L3 Bar -->
+            <div class="grid grid-cols-3 gap-2 bg-scada-bg/70 border border-scada-border rounded-xl p-2.5 text-[11px] font-mono">
+              <div class="text-center border-r border-scada-border">
+                <span class="text-slate-400 block font-sans">Phase L1 (R)</span>
+                <span class="text-white font-semibold">${inv.invVL1.toFixed(1)} V</span> • <span class="text-cyan-300">${inv.invIL1.toFixed(1)} A</span>
+              </div>
+              <div class="text-center border-r border-scada-border">
+                <span class="text-slate-400 block font-sans">Phase L2 (S)</span>
+                <span class="text-white font-semibold">${inv.invVL2.toFixed(1)} V</span> • <span class="text-cyan-300">${inv.invIL2.toFixed(1)} A</span>
+              </div>
+              <div class="text-center">
+                <span class="text-slate-400 block font-sans">Phase L3 (T)</span>
+                <span class="text-white font-semibold">${inv.invVL3.toFixed(1)} V</span> • <span class="text-cyan-300">${inv.invIL3.toFixed(1)} A</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Populate full matrix table
+      const rows = [
+        { label: 'Operating Mode', reg: '0x3000', fn: i => i.state },
+        { label: 'PV1 Voltage / Current', reg: '0x3004', fn: i => `${i.pv1V.toFixed(1)} V / ${i.pv1A.toFixed(1)} A` },
+        { label: 'PV2 Voltage / Current', reg: '0x3006', fn: i => `${i.pv2V.toFixed(1)} V / ${i.pv2A.toFixed(1)} A` },
+        { label: 'Total PV Input Power', reg: '0x3008', fn: i => `${i.pvTotalKw.toFixed(2)} kW` },
+        { label: 'Battery Voltage / Current', reg: '0x3010', fn: i => `${i.batV.toFixed(1)} V / ${i.batA.toFixed(1)} A` },
+        { label: 'Battery Power / SOC / SOH', reg: '0x3012', fn: i => `${i.batKw.toFixed(2)} kW | ${i.soc.toFixed(1)}% | ${i.soh}%` },
+        { label: 'BMS Temperature', reg: '0x3015', fn: i => `${i.bmsTemp.toFixed(1)} °C` },
+        { label: 'Grid Input Voltage (L1/L2/L3)', reg: '0x3018', fn: i => `${i.gridVL1}/${i.gridVL2}/${i.gridVL3} V` },
+        { label: 'Inverter Output V (L1/L2/L3)', reg: '0x3020', fn: i => `${i.invVL1}/${i.invVL2}/${i.invVL3} V` },
+        { label: 'Inverter Output I (L1/L2/L3)', reg: '0x3023', fn: i => `${i.invIL1}/${i.invIL2}/${i.invIL3} A` },
+        { label: 'AC Active Power (P)', reg: '0x3026', fn: i => `${i.activeKw.toFixed(2)} kW` },
+        { label: 'AC Reactive Power (Q)', reg: '0x3028', fn: i => `${i.reactiveKvar.toFixed(2)} kVAr` },
+        { label: 'AC Apparent Power (S)', reg: '0x302A', fn: i => `${i.apparentKva.toFixed(2)} kVA` },
+        { label: 'Output Frequency / PF', reg: '0x302C', fn: i => `${i.freq.toFixed(2)} Hz / ${i.pf.toFixed(3)}` },
+        { label: 'Heatsink Temp / Daily Yield', reg: '0x3030', fn: i => `${i.heatsinkTemp.toFixed(1)} °C / ${i.dailyYieldKwh.toFixed(1)} kWh` }
+      ];
+
+      document.getElementById('inverter-matrix-body').innerHTML = rows.map(r => `
+        <tr class="hover:bg-scada-highlight/40">
+          <td class="py-2 px-4 font-sans text-slate-300">${r.label}</td>
+          <td class="py-2 px-3 text-slate-500">${r.reg}</td>
+          ${state.inverters.map(inv => `<td class="py-2 px-4 text-slate-100">${r.fn(inv)}</td>`).join('')}
+        </tr>
+      `).join('');
+    }
+
+    // =========================================================================
+    // 6. RENDER SCHNEIDER POWER METERS TAB (T1, T2, G1, G2)
+    // =========================================================================
+    function renderMetersTab() {
+      const grid = document.getElementById('meter-cards-grid');
+      grid.innerHTML = state.meters.map(m => {
+        const isTx = m.type === 'TRANSFORMER';
+        const accentText = isTx ? 'text-indigo-400' : 'text-amber-400';
+        const badgeStyle = isTx
+          ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+          : 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+        const brkKey = m.id === 1 ? 'T1' : m.id === 2 ? 'T2' : m.id === 3 ? 'G1' : 'G2';
+
+        return `
+          <div class="bg-scada-panel border border-scada-border rounded-2xl p-4 sm:p-5 space-y-4 shadow-md">
+            <!-- Header -->
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-scada-border pb-3">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded border font-mono text-xs font-bold ${badgeStyle}">SLAVE ID ${m.slaveId}</span>
+                  <h3 class="text-base font-bold text-white">${m.name} (${m.tag})</h3>
+                </div>
+                <p class="text-xs text-slate-400 mt-0.5">Schneider PowerLogic ${m.model} • Rating: ${m.ratingKva} kVA • Freq: <span class="font-mono text-slate-200">${m.freq.toFixed(2)} Hz</span></p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-1 rounded-xl text-xs font-mono font-bold ${m.online ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/15 text-rose-300 border border-rose-500/40'}">
+                  ${m.online ? 'ACB CLOSED' : 'ACB OPEN'}
+                </span>
+                <button onclick="toggleBreaker('${brkKey}')" class="px-2.5 py-1 rounded-xl bg-scada-card hover:bg-scada-highlight border border-scada-border text-xs font-semibold text-slate-200 transition">
+                  Toggle ACB
+                </button>
+              </div>
+            </div>
+
+            <!-- Main Power & Demand KPIs -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+              <div class="bg-scada-bg border border-scada-border rounded-xl p-2.5">
+                <div class="text-slate-400">Active Power (P)</div>
+                <div class="text-base font-mono font-bold ${accentText} mt-0.5">${m.kwTotal.toFixed(1)} <span class="text-[11px] font-normal">kW</span></div>
+              </div>
+              <div class="bg-scada-bg border border-scada-border rounded-xl p-2.5">
+                <div class="text-slate-400">Apparent (S)</div>
+                <div class="text-base font-mono font-bold text-white mt-0.5">${m.kvaTotal.toFixed(1)} <span class="text-[11px] font-normal">kVA</span></div>
+              </div>
+              <div class="bg-scada-bg border border-scada-border rounded-xl p-2.5">
+                <div class="text-slate-400">Reactive (Q)</div>
+                <div class="text-base font-mono font-bold text-slate-200 mt-0.5">${m.kvarTotal.toFixed(1)} <span class="text-[11px] font-normal">kVAr</span></div>
+              </div>
+              <div class="bg-scada-bg border border-scada-border rounded-xl p-2.5">
+                <div class="text-slate-400">Power Factor</div>
+                <div class="text-base font-mono font-bold text-emerald-400 mt-0.5">${m.pfTotal.toFixed(3)} <span class="text-[11px] font-normal">PF</span></div>
+              </div>
+            </div>
+
+            <!-- 3-Phase Voltage & Current Table -->
+            <div class="overflow-x-auto bg-scada-bg border border-scada-border rounded-xl">
+              <table class="w-full text-left border-collapse text-[11px] font-mono">
+                <thead>
+                  <tr class="text-slate-400 border-b border-scada-border">
+                    <th class="py-1.5 px-3 font-sans">Phase</th>
+                    <th class="py-1.5 px-3">V_LN (V)</th>
+                    <th class="py-1.5 px-3">V_LL (V)</th>
+                    <th class="py-1.5 px-3">Current (A)</th>
+                    <th class="py-1.5 px-3">Active (kW)</th>
+                    <th class="py-1.5 px-3">PF</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-scada-border/50 text-slate-200">
+                  <tr>
+                    <td class="py-1.5 px-3 font-sans font-semibold text-rose-400">L1 (Red)</td>
+                    <td class="py-1.5 px-3">${m.vL1N.toFixed(1)}</td>
+                    <td class="py-1.5 px-3">L12: ${m.vL12.toFixed(1)}</td>
+                    <td class="py-1.5 px-3">${m.iL1.toFixed(1)} A</td>
+                    <td class="py-1.5 px-3">${m.kwL1.toFixed(1)}</td>
+                    <td class="py-1.5 px-3">${m.pfL1.toFixed(2)}</td>
+                  </tr>
+                  <tr>
+                    <td class="py-1.5 px-3 font-sans font-semibold text-amber-400">L2 (Yel)</td>
+                    <td class="py-1.5 px-3">${m.vL2N.toFixed(1)}</td>
+                    <td class="py-1.5 px-3">L23: ${m.vL23.toFixed(1)}</td>
+                    <td class="py-1.5 px-3">${m.iL2.toFixed(1)} A</td>
+                    <td class="py-1.5 px-3">${m.kwL2.toFixed(1)}</td>
+                    <td class="py-1.5 px-3">${m.pfL2.toFixed(2)}</td>
+                  </tr>
+                  <tr>
+                    <td class="py-1.5 px-3 font-sans font-semibold text-sky-400">L3 (Blu)</td>
+                    <td class="py-1.5 px-3">${m.vL3N.toFixed(1)}</td>
+                    <td class="py-1.5 px-3">L31: ${m.vL31.toFixed(1)}</td>
+                    <td class="py-1.5 px-3">${m.iL3.toFixed(1)} A</td>
+                    <td class="py-1.5 px-3">${m.kwL3.toFixed(1)}</td>
+                    <td class="py-1.5 px-3">${m.pfL3.toFixed(2)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Footer Revenue & Harmonics -->
+            <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-slate-400 pt-1">
+              <span>Energy Imp: <strong class="text-slate-200">${m.energyImport.toFixed(1)} kWh</strong></span>
+              <span>Neutral I_N: <strong class="text-slate-200">${m.iN.toFixed(1)} A</strong></span>
+              <span>THD V/I: <strong class="text-cyan-300">${m.thdV}% / ${m.thdI}%</strong></span>
+              <span>Peak Demand: <strong class="text-amber-300">${m.demandPeakKw.toFixed(1)} kW</strong></span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Populate full Schneider matrix table
+      const rows = [
+        { label: 'Breaker / Source Status', reg: 'DI-01', fn: m => m.online ? 'ONLINE (CLOSED)' : 'OFFLINE (OPEN)' },
+        { label: 'Voltage L-N Avg (V_L1N/L2N/L3N)', reg: '3028–3036', fn: m => `${m.vLNAvg.toFixed(1)} V (${m.vL1N}/${m.vL2N}/${m.vL3N})` },
+        { label: 'Voltage L-L Avg (V_L12/L23/L31)', reg: '3020–3026', fn: m => `${m.vLLAvg.toFixed(1)} V (${m.vL12}/${m.vL23}/${m.vL31})` },
+        { label: 'Phase Currents (I_L1 / I_L2 / I_L3)', reg: '3000–3004', fn: m => `${m.iL1} / ${m.iL2} / ${m.iL3} A` },
+        { label: 'Neutral Current (I_N)', reg: '3006', fn: m => `${m.iN.toFixed(1)} A` },
+        { label: 'Total Active Power (kW)', reg: '3060', fn: m => `${m.kwTotal.toFixed(2)} kW` },
+        { label: 'Total Reactive Power (kVAr)', reg: '3068', fn: m => `${m.kvarTotal.toFixed(2)} kVAr` },
+        { label: 'Total Apparent Power (kVA)', reg: '3076', fn: m => `${m.kvaTotal.toFixed(2)} kVA` },
+        { label: 'Total Power Factor (PF)', reg: '3084', fn: m => `${m.pfTotal.toFixed(3)}` },
+        { label: 'System Frequency (Hz)', reg: '3110', fn: m => `${m.freq.toFixed(2)} Hz` },
+        { label: 'Voltage / Current THD (%)', reg: '21300', fn: m => `${m.thdV}% / ${m.thdI}%` },
+        { label: 'Active Energy Import (kWh)', reg: '2700', fn: m => `${m.energyImport.toFixed(1)} kWh` },
+        { label: 'Reactive Energy Total (kVArh)', reg: '2708', fn: m => `${m.kvarhTotal.toFixed(1)} kVArh` },
+        { label: 'Max Active Power Demand (kW)', reg: '3700', fn: m => `${m.demandPeakKw.toFixed(1)} kW` }
+      ];
+
+      document.getElementById('meter-matrix-body').innerHTML = rows.map(r => `
+        <tr class="hover:bg-scada-highlight/40">
+          <td class="py-2 px-4 font-sans text-slate-300">${r.label}</td>
+          <td class="py-2 px-3 text-slate-500">${r.reg}</td>
+          ${state.meters.map(m => `<td class="py-2 px-4 text-slate-100">${r.fn(m)}</td>`).join('')}
+        </tr>
+      `).join('');
+    }
+
+    // =========================================================================
+    // 7. REAL-TIME TREND CHART (CHART.JS)
+    // =========================================================================
+    function initTrendChart() {
+      const ctx = document.getElementById('powerTrendChart').getContext('2d');
+      trendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: state.chartHistory.labels,
+          datasets: [
+            {
+              label: 'Transformers (T1+T2 kW)',
+              data: state.chartHistory.tx,
+              borderColor: '#818cf8',
+              backgroundColor: 'rgba(129, 140, 248, 0.1)',
+              borderWidth: 2,
+              tension: 0.3,
+              pointRadius: 0
+            },
+            {
+              label: 'MPS Inverters (4× kW)',
+              data: state.chartHistory.inv,
+              borderColor: '#34d399',
+              backgroundColor: 'rgba(52, 211, 153, 0.1)',
+              borderWidth: 2,
+              tension: 0.3,
+              pointRadius: 0
+            },
+            {
+              label: 'PV Array Total (kW)',
+              data: state.chartHistory.pv,
+              borderColor: '#38bdf8',
+              borderDash: [4, 4],
+              borderWidth: 2,
+              tension: 0.3,
+              pointRadius: 0
+            },
+            {
+              label: 'Generators (G1+G2 kW)',
+              data: state.chartHistory.gen,
+              borderColor: '#fbbf24',
+              backgroundColor: 'rgba(251, 191, 36, 0.1)',
+              borderWidth: 2,
+              tension: 0.3,
+              pointRadius: 0
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: {
+              labels: { color: '#cbd5e1', font: { family: 'Inter', size: 11 } }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#64748b', maxTicksLimit: 8, font: { family: 'JetBrains Mono', size: 10 } },
+              grid: { color: '#1e293b' }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 10 } },
+              grid: { color: '#1e293b' }
+            }
+          }
+        }
+      });
+    }
+
+    function pushChartPoint(pv, inv, tx, gen) {
+      const label = new Date().toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' });
+      const h = state.chartHistory;
+      h.labels.push(label);
+      h.pv.push(+pv.toFixed(1));
+      h.inv.push(+inv.toFixed(1));
+      h.tx.push(+tx.toFixed(1));
+      h.gen.push(+gen.toFixed(1));
+
+      if (h.labels.length > 40) {
+        h.labels.shift();
+        h.pv.shift();
+        h.inv.shift();
+        h.tx.shift();
+        h.gen.shift();
+      }
+      if (trendChart) trendChart.update();
+    }
+
+    // =========================================================================
+    // 8. INTERACTIVE CONTROLS, BREAKER SWITCHING & SCENARIOS
+    // =========================================================================
+    function switchTab(tabName) {
+      const tabs = ['overview', 'inverters', 'meters', 'modbus', 'alarms'];
+      tabs.forEach(t => {
+        const panel = document.getElementById(`tab-${t}`);
+        const btn = document.getElementById(`tab-btn-${t}`);
+        if (t === tabName) {
+          panel.classList.remove('hidden');
+          btn.className = 'tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 whitespace-nowrap bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 transition';
+        } else {
+          panel.classList.add('hidden');
+          btn.className = 'tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 whitespace-nowrap text-slate-400 hover:text-slate-200 hover:bg-scada-card border border-transparent transition';
+        }
+      });
+    }
+
+    function toggleBreaker(key) {
+      state.breakers[key] = !state.breakers[key];
+      const isClosed = state.breakers[key];
+      logAlarm(
+        isClosed ? 'INFO' : 'WARN',
+        `Breaker ${key}`,
+        `Operator toggled ${key} state to ${isClosed ? 'CLOSED (ONLINE)' : 'OPEN (ISOLATED)'}`
+      );
+      showToast(`${key} Breaker ${isClosed ? 'CLOSED' : 'OPENED'}`, isClosed ? 'emerald' : 'amber');
+      simulateTick();
+      updateUI();
+    }
+
+    function setPlantScenario(scen) {
+      state.scenario = scen;
+      const descEl = document.getElementById('scenario-desc');
+      ['scen-normal', 'scen-gen', 'scen-peak'].forEach(id => {
+        document.getElementById(id).className = 'px-3 py-1.5 rounded-xl text-xs font-semibold bg-scada-card text-slate-300 hover:bg-scada-highlight border border-scada-border transition';
+      });
+
+      if (scen === 'NORMAL') {
+        state.breakers.T1 = true;
+        state.breakers.T2 = true;
+        state.breakers.G1 = false;
+        state.breakers.G2 = false;
+        descEl.textContent = 'Normal Grid-Parallel Operation (Transformers T1 & T2 Online, Generators Standby)';
+        document.getElementById('scen-normal').className = 'px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 transition';
+        logAlarm('INFO', 'EMS Controller', 'Switched to Grid-Parallel Mode (T1+T2 active)');
+      } else if (scen === 'GEN_BACKUP') {
+        state.breakers.T1 = false;
+        state.breakers.T2 = false;
+        state.breakers.G1 = true;
+        state.breakers.G2 = true;
+        descEl.textContent = 'Utility Outage Island Mode (T1 & T2 Isolated, Generators G1 & G2 + MPS Inverters Online)';
+        document.getElementById('scen-gen').className = 'px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 transition';
+        logAlarm('WARN', 'ATS / EMS Controller', 'Utility loss simulated — Generators G1 & G2 started and synchronized');
+      } else if (scen === 'PEAK_SHAVE') {
+        state.breakers.T1 = true;
+        state.breakers.T2 = true;
+        state.breakers.G1 = false;
+        state.breakers.G2 = false;
+        descEl.textContent = 'Peak Shaving Dispatch (4× Megarevo MPS Inverters discharging at ~312 kW to minimize utility import)';
+        document.getElementById('scen-peak').className = 'px-3 py-1.5 rounded-xl text-xs font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 transition';
+        logAlarm('INFO', 'EMS Peak Shaver', 'Dispatched Megarevo MPS #1–#4 to high discharge setpoint');
+      }
+      simulateTick();
+      updateUI();
+    }
+
+    function setDataMode(mode) {
+      state.mode = mode;
+      const btnSim = document.getElementById('btn-mode-sim');
+      const btnLive = document.getElementById('btn-mode-live');
+      if (mode === 'SIM') {
+        btnSim.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40';
+        btnLive.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200';
+        showToast('Switched to Built-in Substation Simulation Mode', 'cyan');
+      } else {
+        btnLive.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        btnSim.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200';
+        showToast(`Polling Live LTE API at ${state.gateway.apiUrl}`, 'emerald');
+      }
+      pollTelemetry();
+    }
+
+    function updatePollInterval(ms) {
+      state.pollIntervalMs = parseInt(ms, 10);
+      if (state.pollTimer) clearInterval(state.pollTimer);
+      state.pollTimer = setInterval(pollTelemetry, state.pollIntervalMs);
+      showToast(`Polling interval updated to ${(state.pollIntervalMs / 1000).toFixed(1)}s`, 'cyan');
+    }
+
+    // =========================================================================
+    // 9. ALARMS, GATEWAY MODAL, CLIPBOARD & CSV EXPORT
+    // =========================================================================
+    function logAlarm(severity, source, message) {
+      state.alarms.unshift({
+        time: new Date().toLocaleTimeString(),
+        severity,
+        source,
+        message,
+        status: 'ACTIVE'
+      });
+      if (state.alarms.length > 50) state.alarms.pop();
+      renderAlarmsTab();
+    }
+
+    function renderAlarmsTab() {
+      document.getElementById('alarm-badge').textContent = state.alarms.length;
+      document.getElementById('alarm-table-body').innerHTML = state.alarms.map(a => {
+        const badge = a.severity === 'WARN'
+          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+          : 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30';
+        return `
+          <tr class="hover:bg-scada-highlight/40">
+            <td class="py-2.5 px-4 text-slate-400">${a.time}</td>
+            <td class="py-2.5 px-4"><span class="px-2 py-0.5 rounded border text-[10px] font-bold ${badge}">${a.severity}</span></td>
+            <td class="py-2.5 px-4 text-slate-200 font-semibold">${a.source}</td>
+            <td class="py-2.5 px-4 font-sans text-slate-300">${a.message}</td>
+            <td class="py-2.5 px-4 text-emerald-400">${a.status}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function clearAlarms() {
+      state.alarms = [];
+      renderAlarmsTab();
+      showToast('Alarm journal cleared', 'cyan');
+    }
+
+    function openGatewayModal() {
+      document.getElementById('cfg-gw-ip').value = state.gateway.ip;
+      document.getElementById('cfg-gw-port').value = state.gateway.port;
+      document.getElementById('cfg-gw-timeout').value = state.gateway.timeout;
+      document.getElementById('cfg-api-url').value = state.gateway.apiUrl;
+      const modal = document.getElementById('gateway-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeGatewayModal() {
+      const modal = document.getElementById('gateway-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function saveGatewayConfig() {
+      state.gateway.ip = document.getElementById('cfg-gw-ip').value.trim() || '10.8.0.12';
+      state.gateway.port = parseInt(document.getElementById('cfg-gw-port').value, 10) || 502;
+      state.gateway.timeout = parseInt(document.getElementById('cfg-gw-timeout').value, 10) || 1500;
+      state.gateway.apiUrl = document.getElementById('cfg-api-url').value.trim() || '/api/telemetry';
+
+      document.getElementById('hdr-gateway-addr').textContent = `${state.gateway.ip}:${state.gateway.port}`;
+      logAlarm('INFO', 'Gateway Config', `Updated LTE RTU Gateway target to ${state.gateway.ip}:${state.gateway.port}`);
+      closeGatewayModal();
+      showToast('LTE Gateway configuration saved', 'emerald');
+    }
+
+    function copyTermuxScript() {
+      const text = document.getElementById('termux-code-block').innerText;
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast('Termux setup script copied to clipboard!', 'emerald');
+      } catch (e) {
+        showToast('Copy failed — please select text manually', 'amber');
+      }
+      document.body.removeChild(ta);
+    }
+
+    function exportTelemetryCSV() {
+      const lines = ['Timestamp,DeviceType,SlaveID,Name,ActivePower_kW,ReactivePower_kVAr,ApparentPower_kVA,Voltage_V,Current_A,Frequency_Hz,Extra'];
+      const ts = new Date().toISOString();
+
+      state.inverters.forEach(i => {
+        lines.push(`${ts},Megarevo_MPS,${i.slaveId},"${i.name}",${i.activeKw},${i.reactiveKvar},${i.apparentKva},${i.invVL1},${i.invIL1},${i.freq},"PV=${i.pvTotalKw}kW;SOC=${i.soc}%"`);
+      });
+      state.meters.forEach(m => {
+        lines.push(`${ts},Schneider_PM,${m.slaveId},"${m.name}",${m.kwTotal},${m.kvarTotal},${m.kvaTotal},${m.vLLAvg},${m.iAvg},${m.freq},"PF=${m.pfTotal};kWh=${m.energyImport}"`);
+      });
+
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `scada_telemetry_${Date.now()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Exported SCADA telemetry snapshot to CSV', 'emerald');
+    }
+
+    function showToast(msg, color = 'cyan') {
+      const container = document.getElementById('toast-container');
+      const el = document.createElement('div');
+      const borderCol = color === 'emerald' ? 'border-emerald-500/50 text-emerald-200'
+                      : color === 'amber'   ? 'border-amber-500/50 text-amber-200'
+                      : 'border-cyan-500/50 text-cyan-200';
+      el.className = `bg-scada-panel/95 backdrop-blur border ${borderCol} px-4 py-2.5 rounded-xl shadow-2xl text-xs font-medium transition-opacity duration-300`;
+      el.textContent = msg;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 300);
+      }, 2800);
+    }
+
+    function handleCustomLogoUpload(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = document.getElementById('custom-company-logo');
+        const defaultSvg = document.getElementById('default-in4solar-logo');
+        img.src = e.target.result;
+        img.classList.remove('hidden');
+        defaultSvg.classList.add('hidden');
+        try {
+          localStorage.setItem('scada_custom_logo', e.target.result);
+        } catch (err) {
+          // Ignore quota limits if image is very large
+        }
+        showToast('Custom company logo updated!', 'emerald');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // =========================================================================
+    // 10. BOOTSTRAP ON WINDOW LOAD
+    // =========================================================================
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      try {
+        const savedLogo = localStorage.getItem('scada_custom_logo');
+        if (savedLogo) {
+          const img = document.getElementById('custom-company-logo');
+          img.src = savedLogo;
+          img.classList.remove('hidden');
+          document.getElementById('default-in4solar-logo').classList.add('hidden');
+        }
+      } catch (e) {}
+      initDevices();
+      initTrendChart();
+      // Seed initial 12 historical points so the trend chart looks rich immediately
+      for (let i = 0; i < 12; i++) {
+        simulateTick();
+        const pv = state.inverters.reduce((s, x) => s + x.pvTotalKw, 0);
+        const inv = state.inverters.reduce((s, x) => s + x.activeKw, 0);
+        const tx = state.meters.filter(m => m.type === 'TRANSFORMER').reduce((s, x) => s + x.kwTotal, 0);
+        const gen = state.meters.filter(m => m.type === 'GENERATOR').reduce((s, x) => s + x.kwTotal, 0);
+        pushChartPoint(pv, inv, tx, gen);
+      }
+      updateUI();
+      state.pollTimer = setInterval(pollTelemetry, state.pollIntervalMs);
+    });
+  </script>
+</body>
+
+</html>

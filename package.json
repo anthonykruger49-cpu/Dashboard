@@ -1,0 +1,34 @@
+{
+  "name": "ems-scada-dashboard",
+  "version": "1.0.0",
+  "description": "EMS-SCADA Megarevo MPS & Schneider PowerLogic Monitor",
+  "author": "Your Name",
+  "license": "UNLICENSED",
+  "main": "main.js",
+  "scripts": {
+    "prepare-assets": "node scripts/prepare.js",
+    "start": "electron .",
+    "dist": "npm run prepare-assets && electron-builder --win --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.ems.scada.dashboard",
+    "productName": "EMS-SCADA Dashboard",
+    "files": ["main.js", "app/**/*"],
+    "directories": { "output": "dist", "buildResources": "build" },
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "artifactName": "EMS-SCADA-Dashboard-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "EMS-SCADA Dashboard"
+    }
+  }
+}
