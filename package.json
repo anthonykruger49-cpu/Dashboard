@@ -17,7 +17,7 @@
   "build": {
     "appId": "com.ems.scada.dashboard",
     "productName": "EMS-SCADA Dashboard",
-    "files": ["main.js", "app/**/*"],
+    "files": ["main.js", "gateway.js", "registers.js", "app/**/*"],
     "directories": { "output": "dist", "buildResources": "build" },
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }],
