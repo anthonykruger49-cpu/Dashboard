@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu, session, shell } = require('electron');
 const path = require('path');
+const { startServer } = require('./gateway');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -35,6 +36,7 @@ function createWindow() {
 
 Menu.setApplicationMenu(null);
 app.whenReady().then(() => {
+  startServer(8085);   // local Modbus TCP -> JSON bridge for the LTE gateway
   createWindow();
   app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow());
 });
